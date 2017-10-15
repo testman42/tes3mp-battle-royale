@@ -1,6 +1,8 @@
 # mwTDM
 "Team Deathmatch" for TES3MP v0.6.1.
+
 Lots of customizable settings are available; just open mwTDM.lua and look for **CONFIG/SETTINGS SECTION**.
+
 **PLEASE NOTE**: Not *all* NPCs are properly deleted on map initialization, so admins might want to use the cell data in the **Cleared Cell Data** folder. Just place the files in .../mp-stuff/data/cell or .../PluginExamples/data/cell.
 The first map in rotation will typically have all NPCs properly deleted.
 
