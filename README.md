@@ -7,15 +7,15 @@ Lots of customizable settings are available; just open mwTDM.lua and look for **
 The first map in rotation will typically have all NPCs properly deleted.
 
 # Commands
- /maps
- /nextmap (admin-only)
- /restart (admin-only)
- /set equipment <ranged/melee> (admin-only)
- /set <spawnTime/health/magicka/fatigue/score/luck/speed/acrobatics/marksman> <number> (admin-only, requires /restart to take effect)
- /score
- /stats
- /switch
- /teams
+* /maps (see mwTDM.lua for map rotation options)
+* /nextmap (admin-only)
+* /restart (admin-only)
+* /set equipment <ranged/melee> (admin-only)
+* /set <spawnTime/health/magicka/fatigue/score/luck/speed/acrobatics/marksman> <number> (admin-only, requires /restart to take effect)
+* /score
+* /stats
+* /switch
+* /teams
 
 # Installation
 Download both mwTDM.lua & mwTDMSpawns.lua and place them in your .../mp-stuff/scripts/ (WINDOWS) or .../PluginExamples/scripts (LINUX PACKAGE) folder, then read both sections below.
@@ -25,12 +25,36 @@ Open the existing **server.lua** file in the same folder and make the following 
 
 Find **function OnServerInit()** and change the following:
 ```
+function OnServerInit()
+
+    local version = tes3mp.GetServerVersion():split(".") -- for future versions
+
+    if tes3mp.GetServerVersion() ~= "0.6.1" then
+        tes3mp.LogMessage(3, "The server or script is outdated!")
+        tes3mp.StopServer(1)
+    end
+
+    myMod.InitializeWorld()
+    myMod.PushPlayerList(Players)
+
     LoadBanList()
     LoadPluginList()
 end
 ```
 to:
 ```
+function OnServerInit()
+
+    local version = tes3mp.GetServerVersion():split(".") -- for future versions
+
+    if tes3mp.GetServerVersion() ~= "0.6.1" then
+        tes3mp.LogMessage(3, "The server or script is outdated!")
+        tes3mp.StopServer(1)
+    end
+
+    myMod.InitializeWorld()
+    myMod.PushPlayerList(Players)
+
     LoadBanList()
     LoadPluginList()
 	mwTDM.MatchInit()
