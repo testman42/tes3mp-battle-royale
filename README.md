@@ -10,7 +10,7 @@ Lots of customizable settings are available; just open mwTDM.lua and look for **
 * /nextmap (admin-only)
 * /restart (admin-only)
 * /set equipment <ranged/melee> (admin-only)
-* /set <spawnTime/health/magicka/fatigue/score/luck/speed/acrobatics/marksman> <number> (admin-only, requires /restart to take effect)
+* /set <spawnTime/health/magicka/fatigue/score/luck/speed/acrobatics/marksman> number (admin-only, requires /restart to take effect)
 * /score
 * /stats
 * /switch
