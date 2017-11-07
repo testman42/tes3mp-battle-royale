@@ -22,6 +22,16 @@ Download both mwTDM.lua & mwTDMSpawns.lua and place them in your .../mp-stuff/sc
 # Changes to .../scripts/server.lua
 Open the existing **server.lua** file in the same folder and make the following changes (use CTRL-F or something similar):
 
+Find and change the following:
+```
+myMod = require("myMod")
+```
+to:
+```
+myMod = require("myMod")
+mwTDM = require("mwTDM")
+```
+
 Find **function OnServerInit()** and change the following:
 ```
 function OnServerInit()
