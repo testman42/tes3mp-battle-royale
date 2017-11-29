@@ -150,6 +150,9 @@ Find the following block:
             local message = "Not a valid command. Type /help for more info.\n"
             tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
         end
+
+	return true -- default behavior, chat messages should not
+end
 ```
 and change it to:
 ```
@@ -242,6 +245,9 @@ and change it to:
             local message = "Not a valid command. Type /help for more info.\n"
             tes3mp.SendMessage(pid, color.Error..message..color.Default, false)
         end
+
+	return true -- default behavior, chat messages should not
+end
 ```
 
 # Changes to .../scripts/cell/base.lua
