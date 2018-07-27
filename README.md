@@ -160,7 +160,7 @@ and change it to:
             local message = myMod.GetChatName(pid) .. ": " .. color.GreenText .. ">" .. tableHelper.concatenateFromIndex(cmd, 2) .. "\n"
             tes3mp.SendMessage(pid, message, true)
 			
-		elseif string.lower(cmd[1]) == "set" and cmd[2] and cmd[3] ~= nil and admin then
+		elseif string.lower(cmd[1]) == "set" and cmd[2] ~= nil and cmd[3] ~= nil and admin then
 			
 			if type(tonumber(cmd[3])) ~= "number" then
 				
