@@ -1,4 +1,7 @@
 # TES3MP Deathmatch
+
+[![Generic badge](https://img.shields.io/badge/code%20style-spaghetti-yellow.svg)](https://img.devrant.com/devrant/rant/r_172856_HvF2J.jpg)
+
 Deathmatch and Team Deathmatch for TES3MP 0.7.0-alpha.
 
 Lots of customizable settings are available; just open testDM.lua and look for **CONFIG/SETTINGS SECTION**.
