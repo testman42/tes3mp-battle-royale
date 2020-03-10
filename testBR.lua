@@ -25,9 +25,10 @@
 -- - use cell based system at the start
 -- - switch to coordinates-math-distance-circle at the end
 -- longer drop speed boost time
--- implement a config option that determines if server will use 2-step joining (/join and then /ready) or just one (just /ready)
+-- implement a config option that determines if server will use 2-step match initiation (/newmatch and then /ready) or just one (just /ready)
 -- - read: do we even want everyone on server to participate in round or do we allow them to "sit a round out"?
 -- - will use a single step match creation logic for now. Figure out proper two-step match creation mechanics in this time.
+-- - well, the creation logic will always be two-step. Difference is just if the first step is in hands of players or if it's automated by server
 -- decide on terminoligy. Is one session of battle royale called a "match" or a "round"?
 -- - Renaming all to "match" for now just for consistency, can Ctrl+H it later
 -- decide on what should always be part of a log and what should be just debug message
@@ -39,6 +40,20 @@
 
 Usually I like to plan out project development, but this time I went directly into the code and I got lost very quickly in a mess of concepts.
 So with this we are taking a step back and defining some things that can help make sense of this mess of a code below.
+
+Match start logic:
+
+There are two stages of the lobby process.
+
+First one is when there is nothing happening. Players are in the lobby, they can move around, also they can fight and kill each other without consequences.
+They respawn in lobby if killed. At this stage, it is possible to initiate second stage.
+The second stage is used to determine if match can be started and which players will be participating in said match.
+The variable in the configuration section of this script determines if the players are in control of initiating the second stage or if it is controlled by server.
+The second stage lasts for the determined amount of time and at the end of that period the server checks if criteria for start of the match is met.
+Criteria 
+If initiation of second stage is controlled by the server, then the stage starts as soon as the second player logs in.
+
+maybe TODO: draw flowchart for this process using http://asciiflow.com/
 
 Overall logic:
 
@@ -73,9 +88,11 @@ Below example is for grid with 4 levels. Each time fog shrinks, it moves one lev
 #------------------------------+
 (# represents the coordinates that are saved in array, + and the lines are extrapolated from the given two cells)
 
-fogLevel - one set of cells. It is used to easily determine if cell that player entered should cause damage to player or not.
+fogZone - one set of cells. It is used to easily determine if cell that player entered should cause damage to player or not.
+-- TODO: this needs to be renamed to "zone" or something like it, because overuse of the term "level" in this script is getting out of hand
 
 fogStage - basically index of fog progress
+
 
 ]]
 
@@ -130,12 +147,17 @@ playerMarksman = 150
 
 -- turns out it's much easier if you don't try to combine arrays whose elements do not necesarily correspond
 -- config that determines how the fog will behave 
-fogLevelSizes = {"all", 20, 15, 10, 5, 3, 1}
+fogZoneSizes = {"all", 20, 15, 10, 5, 3, 1}
 
 --fogStageDurations = {6000, 3000, 240, 120, 120, 60, 60, 0}
-fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
+--fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
+fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
 -- determines the order of how levels increase damage
+-- TODO: Would it make more sense to abandon this and instead map values to integers
+-- have -1 be "nothing", 0 would be warning, and then positive integers
+-- but that would make whole thing less customisable
+-- let's keep it like this for now
 fogDamageValues = {"warn", 1, 2, 3}
 
 
@@ -150,10 +172,9 @@ weaponList = {}
 armorList = {}
 
 -- determines how the process for starting the match goes
--- if false, then server periodically proposes new match and starts it if criteria is met
--- if true, then players are in control of proposing a new match
-twoStepJoinProcess = false
-
+-- if true, then server periodically proposes new match and starts it if criteria is met (just /ready)
+-- if false, then players are in control of proposing a new match (/newmatch then /ready)
+automaticMatchmaking = true
 
 -- how many seconds does match proposal last
 matchProposalTime = 30
@@ -167,8 +188,8 @@ lobbyCoordinates = {2177.776367, 653.002380, -184.874023}
 
 -- how the shrinking zone is called in game
 -- start with uppercase because it's at the start of the sentence
---fogName = "Blight storm" 
-fogName = "Blizzard"
+fogName = "Blight storm" 
+--fogName = "Blizzard"
 
 -- how long does each stage last, in seconds
 -- enter values in reverse, because airmode is used as index
@@ -176,7 +197,7 @@ fogName = "Blizzard"
 -- 15 is about how much time it takes to fall from spawn to the top of Red Mountain. 
 -- 30 should be enough to fall to any ground safely
 -- TODO: does anyone want this to be in ascending order? We could use #airDropStageTimes - airmode + 1 to achieve this.
-airDropStageTimes = {30, 15}
+airDropStageTimes = {35, 25}
 
 -- ====================== GLOBAL VARIABLES ======================
 
@@ -205,10 +226,6 @@ fogGridLimits = {}
 
 -- for warnings about time remaining until fog shrinks
 fogShrinkRemainingTime = 0
-
--- do players use /join and then /ready or do they do just /ready
--- determines whether match proposing is automated or if players have more control over timing
-twoStepMatchmaking = false
 
 -- used for handling the stages of player movement at the start of the match
 airmode = 0
@@ -253,6 +270,7 @@ function copyTable(t)
 end
 
 -- searches list for value
+-- since we can't steal "if element in list" from Python
 function IsInList(value, list)
     for index, item in ipairs(list) do
         if item == value then
@@ -262,18 +280,36 @@ function IsInList(value, list)
     return false
 end
 
--- ====================== MATCH-RELATED FUNCTIONS ======================
-
-function EndMatchProposal()
-	tes3mp.LogMessage(2, "Ending current match proposal")
-	if #readyList >= #playerList then
-		testBR.StartMatch()
-	else
-		tes3mp.SendMessage(0, "Match was not started.\n", true)
-	end
-	matchProposalInProgress = false
-    readyList = {}
+-- since apparently doing table.remove(table, value) would be just too easy
+function RemoveFromList(value, list)
+    for index, item in ipairs(list) do
+        if item == value then
+            table.remove(list, index)
+        end
+    end
 end
+
+-- ====================== MATCH-RELATED FUNCTIONS =====================
+
+--
+function AdvanceFog()
+	tes3mp.SendMessage(0,fogName .. " is shrinking.\n", true)
+	currentFogStage = currentFogStage + 1
+
+    testBR.StartFogTimerForStage(currentFogStage)
+
+	testBR.UpdateMap()
+
+	for _, pid in pairs(playerList) do
+		if Players[pid]:IsLoggedIn() then
+			-- send new map state to player
+			testBR.SendMapToPlayer(pid)
+			-- apply fog effects to players in cells that are now in fog
+			testBR.UpdateDamageLevel(pid)
+		end
+	end
+end
+
 
 function HandleAirTimerTimeout()
     DebugLog(2, "AirTimer Timeout")
@@ -281,12 +317,14 @@ function HandleAirTimerTimeout()
 end
 
 function HandleShrinkTimerAlertTimeout()
-	for pid, player in pairs(Players) do
-		if fogShrinkRemainingTime > 60 then
-			tes3mp.MessageBox(pid, -1, fogName .. " shrinking in a minute!")
-		else
-			tes3mp.MessageBox(pid, -1, fogName .. " shrinking in " .. tostring(fogShrinkRemainingTime))
-		end
+	for _, pid in pairs(playerList) do
+        if Players[pid]:IsLoggedIn() then
+		    if fogShrinkRemainingTime > 60 then
+			    tes3mp.MessageBox(pid, -1, fogName .. " shrinking in a minute!")
+		    else
+			    tes3mp.MessageBox(pid, -1, fogName .. " shrinking in " .. tostring(fogShrinkRemainingTime))
+		    end
+        end
 	end
 
 	-- now that minute warning is done, set timer for 10 second warning
@@ -304,38 +342,27 @@ function HandleShrinkTimerAlertTimeout()
 	end
 end
 
-function AdvanceFog()
-	tes3mp.SendMessage(0,fogName .. " is shrinking.\n", true)
-	currentFogStage = currentFogStage + 1
-	if currentFogStage <= #fogStageDurations then
-		testBR.StartFogTimer(fogStageDurations[currentFogStage])
-		if fogStageDurations[currentFogStage] > 60 then
-			fogShrinkRemainingTime = fogStageDurations[currentFogStage] - 60
-		else
-			fogShrinkRemainingTime = fogStageDurations[currentFogStage]
-		end
-		-- TODO: make this actually work before enabling it
-		--testBR.StartShrinkAlertTimer(fogShrinkRemainingTime)
-		testBR.TEMP_StartShrinkAlertTimer(fogShrinkRemainingTime)
+function EndMatchProposal()
+	tes3mp.LogMessage(2, "Ending current match proposal")
+    matchProposalInProgress = false
+    DebugLog(2, "readyList has " .. tostring(#readyList) .. " PIDs in it")
+	if #readyList >= 2 then
+        tes3mp.SendMessage(0, "Match has started.\n", true)
+		testBR.StartMatch()
+	else
+		tes3mp.SendMessage(0, "Match was not started.\n", true)
+        if automaticMatchmaking then
+            testBR.StartMatchProposal()
+        end
 	end
-
-	testBR.UpdateMap()
-
-	for pid, player in pairs(Players) do
-		if player ~= nil and player:IsLoggedIn() and IsInList(pid, playerList) then
-			-- send new map state to player
-			testBR.SendMapToPlayer(pid)
-			-- apply fog effects to players in cells that are now in fog
-			testBR.CheckCellDamageLevel(pid)
-		end
-	end
+    readyList = {}
 end
 
-testBR.OnServerPostInit = function()
 
-    if not twoStepJoinProcess then
-        tes3mp.LogMessage(2, "Starting automatic match proposal" )
-        testBR.StartAutomaticMatchProposal()
+-- check the config for what type of matchmaking process is used and starts the process if needed
+testBR.OnServerPostInit = function()
+    if automaticMatchmaking then
+        testBR.StartMatchProposal()
     end
 end
 
@@ -352,12 +379,34 @@ testBR.StartMatch = function()
 
     DebugLog(2, "playerList has " .. tostring(#playerList) .. " PIDs in it")
 	for _, pid in pairs(playerList) do
-        testBR.PlayerInit(pid)
+        if Players[pid]:IsLoggedIn() then
+            testBR.PlayerInit(pid)
+        else
+            RemoveFromList(pid, playerList)
+        end
 	end
 
     -- has to be after for loop, otherwise PlayerInit resets the initial speed given by first stage of Airdrop
     testBR.StartAirdrop()
 	
+end
+
+-- end match and send everyone back to the lobby
+testBR.EndMatch = function()
+    -- Stop the shhrinking timer
+    tes3mp.StopTimer(fogTimer)
+    -- respawn all the remaining players back in lobby
+	for _, pid in pairs(playerList) do
+        if Players[pid]:IsLoggedIn() then
+		    testBR.SpawnPlayer(pid, true)
+        end
+	end
+    playerList = {}
+    --testBR.ResetWorld()
+
+    if automaticMatchmaking then
+        testBR.StartMatchProposal()
+    end
 end
 
 -- TODO: implement this after implementing chests / drop-on-death
@@ -366,26 +415,41 @@ testBR.ResetWorld = function()
 end
 
 -- starts a new match proposal
--- can be started by server or by player
-testBR.StartMatchProposal = function(pid)
-	tes3mp.LogMessage(2, "Proposing a start of a new match")
-	matchProposalInProgress = true
-    readyList = {}
-    if not pid ~= nil then
-        tes3mp.SendMessage(pid, "New match will start if all participants are ready. Type /ready to confirm.\n", true)
+testBR.StartMatchProposal = function()
+    DebugLog(3, "Running StartMatchProposal function")
+    -- check if there are at least 2 players on server and that there is no other match proposal already in progress
+    -- Apparently at this stage the #Players shows 0 after 1 player is online and 1 once second players is online
+    -- So instead of trying to figure out why this is so, we will just shift things for 1, replacing 1 with 0
+    if #Players > 0 and not matchInProgress and not matchProposalInProgress then
+        tes3mp.LogMessage(2, "Proposing a start of a new match")
+        tes3mp.SendMessage(0, "New match is being proposed. Type /ready in the next " .. tostring(matchProposalTime) .. " seconds in order to join.\n", true)
+	    matchProposalInProgress = true
+        readyList = {}
+	    matchProposalTimer = tes3mp.CreateTimerEx("EndMatchProposal", time.seconds(matchProposalTime), "i", 1)
+	    tes3mp.StartTimer(matchProposalTimer)
+    else
+        DebugLog(3, "#Players: " .. tostring(#Players) .. ", matchInProgress: " .. tostring(matchInProgress) .. ", matchProposalInProgress" .. tostring(matchProposalInProgress))
+        reasonMessage = "Something went horribly wrong on the server. This should NEVER happen. Go yell at testman\n"
+        if #Players <= 0 then
+            tes3mp.LogMessage(2, "Not enough players to start match proposal")
+            reasonMessage = "New match proposal was not started because there are not enough players on the server.\n"
+        elseif matchInProgress then
+            tes3mp.LogMessage(2, "Match in progress, won't start proposal for new one")
+            reasonMessage = "New match proposal was not started because the match is currently in progress.\n"
+        elseif matchProposalInProgress then
+            tes3mp.LogMessage(2, "Match proposal already in process")
+            reasonMessage = "New match proposal was not started because one is already in progress.\n"
+        end
+        if #Players > 0 then
+            tes3mp.SendMessage(0, reasonMessage, true)
+        end
     end
-	matchProposalTimer = tes3mp.CreateTimerEx("EndMatchProposal", time.seconds(matchProposalTime), "i", 1)
-	tes3mp.StartTimer(matchProposalTimer)
-end
-
-testBR.StartAutomaticMatchProposal = function()
-
 end
 
 -- set the damage level for player at cell transition
 -- TODO: make it so that damage level doesn't get cleared and re-applied on every cell transition
-testBR.CheckCellDamageLevel = function(pid)
-	tes3mp.LogMessage(2, "Checking new cell for PID " .. tostring(pid))
+testBR.UpdateDamageLevel = function(pid)
+	tes3mp.LogMessage(2, "Updating damage level for PID " .. tostring(pid))
 	playerCell = Players[pid].data.location.cell
 	DebugLog(3, "playerCell for PID " .. tostring(pid) .. ": " .. tostring(playerCell))
 
@@ -394,68 +458,108 @@ testBR.CheckCellDamageLevel = function(pid)
         tes3mp.LogMessage(2, tostring(playerCell) .. " is not external cell and therefore can't have damage level.")
         return false
     end
-    
-	-- danke StackOverflow
-	x, y = playerCell:match("([^,]+),([^,]+)")
 
-	foundLevel = false
-
-	for level=1,#fogGridLimits do
-		DebugLog(2, "GetCurrentDamageLevel: " .. tostring(testBR.GetCurrentDamageLevel(level)))
-		DebugLog(3, "x == number: " .. tostring(type(tonumber(x)) == "number"))
-		DebugLog(3, "y == number: " .. tostring(type(tonumber(y)) == "number"))
-		DebugLog(3, "cell only in level: " .. tostring(testBR.IsCellOnlyInLevel({tonumber(x), tonumber(y)}, level)))
-		if type(testBR.GetCurrentDamageLevel(level)) == "number" and type(tonumber(x)) == "number" 
-		and type(tonumber(y)) == "number" and testBR.IsCellOnlyInLevel({tonumber(x), tonumber(y)}, level) then
-			testBR.SetFogDamageLevel(pid, testBR.GetCurrentDamageLevel(level))
-			foundLevel = true
-			DebugLog(2, "Damage level for PID " .. tostring(pid) .. " is set to " .. tostring(currentFogStage - level))
-			break
-		end
-	end
+	newDamageLevel = testBR.CheckCellDamageLevel(playerCell)
 	
-	if not foundLevel then
+	if not newDamageLevel then
 		testBR.SetFogDamageLevel(pid, 0)
 	end
 end
 
 
+testBR.CheckCellDamageLevel = function(cell)
+	tes3mp.LogMessage(2, "Checking damage level for cell " .. tostring(cell))
+
+    damageLevel = nil
+
+    -- sanity check
+    if not testBR.IsCellExternal(cell) then
+        tes3mp.LogMessage(2, tostring(cell) .. " is not external cell and therefore can't have damage level.")
+        return nil
+    end
+    
+	-- danke StackOverflow
+	x, y = playerCell:match("([^,]+),([^,]+)")
+
+	for level=1,#fogGridLimits do
+		DebugLog(2, "GetCurrentDamageLevel: " .. tostring(testBR.GetCurrentDamageLevel(level)))
+		DebugLog(3, "x is number: " .. tostring(tonumber(x)))
+		DebugLog(3, "y is number: " .. tostring(tonumber(y)))
+		DebugLog(3, "cell only in level: " .. tostring(testBR.IsCellOnlyInZone({tonumber(x), tonumber(y)}, level)))
+		if tonumber(testBR.GetCurrentDamageLevel(level)) and tonumber(x) and tonumber(y)
+        and testBR.IsCellOnlyInZone({tonumber(x), tonumber(y)}, level) then
+			testBR.SetFogDamageLevel(pid, testBR.GetCurrentDamageLevel(level))
+			foundLevel = true
+			DebugLog(2, "Damage level for PID " .. tostring(pid) .. " is set to " .. tostring(testBR.GetCurrentDamageLevel(level)))
+			break
+		end
+	end
+	
+	return damageLevel
+end
+
+
 testBR.StartFogShrink = function()
-    fogGridLimits = testBR.GenerateFogGrid(fogLevelSizes)
+    fogGridLimits = testBR.GenerateFogGrid(fogZoneSizes)
     DebugLog(2, "fogGridLimits is an array with " .. tostring(#fogGridLimits) .. " elements")
 
 	currentFogStage = 1
 
-    testBR.StartFogTimer(fogStageDurations[currentFogStage])
+    testBR.StartFogTimerForStage(currentFogStage)
+end
+
+testBR.StartFogTimerForStage = function(stage)
+	tes3mp.LogMessage(2, "Setting shrink timer for stage" .. tostring(stage))
+	testBR.StartFogTimer(fogStageDurations[stage])
 end
 
 testBR.StartFogTimer = function(delay)
-	tes3mp.LogMessage(2, "Setting shrink timer for " .. tostring(delay) .. " seconds")
-	tes3mp.SendMessage(0,fogName .. " shrinking in " .. tostring(delay) .. " seconds.\n", true)
+	tes3mp.LogMessage(2, "Setting shrink timer to " .. tostring(delay) .. " seconds")
+	tes3mp.SendMessage(0,fogName .. " will be shrinking in " .. tostring(delay) .. " seconds.\n", true)
 	fogTimer = tes3mp.CreateTimerEx("AdvanceFog", time.seconds(delay), "i", 1)
 	tes3mp.StartTimer(fogTimer)
 end
 
 -- delay is for how long timer will last
--- init is to tell the function if it is being called for the first time. If not, then assume recursion
+--[[
 testBR.StartShrinkAlertTimer = function(delay)
 	tes3mp.LogMessage(2, "Setting shrink timer alert for " .. tostring(delay) .. " seconds")
 	shrinkAlertTimer = tes3mp.CreateTimerEx("HandleShrinkTimerAlertTimeout", time.seconds(delay), "i", 1)
+	tes3mp.StartTimer(shrinkAlertTimer)
+end 
+]]
+
+-- start a timer 
+testBR.StartShrinkAlertTimer = function(stage)
+	tes3mp.LogMessage(2, "Setting shrink timer alert for fog stage" .. tostring(stage))
+    fogShrinkRemainingTime = 0
+    if stage <= #fogStageDurations then
+		testBR.StartFogTimer(fogStageDurations[stage])
+		if fogStageDurations[stage] > 60 then
+			fogShrinkRemainingTime = fogStageDurations[stage] - 60
+		else
+			fogShrinkRemainingTime = fogStageDurations[stage]
+		end
+		-- TODO: make this actually work before enabling it
+		--testBR.StartShrinkAlertTimer(fogShrinkRemainingTime)
+		testBR.StartShrinkAlertTimer(fogShrinkRemainingTime)
+	end
+	shrinkAlertTimer = tes3mp.CreateTimerEx("HandleShrinkTimerAlertTimeout", time.seconds(fogStageDurations[stage]), "i", 1)
 	tes3mp.StartTimer(shrinkAlertTimer)
 end
 
 -- returns a list of squares that are to be used for fog levels
 -- for example: { {{10, 0}, {0, 10}}, {{5, 5}, {5, 5}}, {} }
-testBR.GenerateFogGrid = function(fogLevelSizes)	
+testBR.GenerateFogGrid = function(fogZoneSizes)	
 	tes3mp.LogMessage(2, "Generating fog grid")
 	generatedFogGrid = {}
 
-	for level=1,#fogLevelSizes do
+	for level=1,#fogZoneSizes do
 		tes3mp.LogMessage(2, "Generating level " .. tostring(level))
 		generatedFogGrid[level] = {}
 		
 		-- handle the first item in the array (double check just to be sure)
-		--if type(fogLevelSizes[level]) ~= "number" and fogLevelSizes[level] = "all" then
+		--if type(fogZoneSizes[level]) ~= "number" and fogZoneSizes[level] = "all" then
 		-- or lol, we can just check if this is first time going through the loop
 		-- this does assume that config is not messed up, that first entry is meant to be whole area
 		if level == 1 then
@@ -480,11 +584,11 @@ testBR.GenerateFogGrid = function(fogLevelSizes)
 
 			-- figure out if there is space for next level
 			-- -1 because we are checking if new size fits into a square that is one cell smaller from both sides
-			if fogLevelSizes[level] < previousXLength - 1 and fogLevelSizes[level] < previousYLength - 1 then
+			if fogZoneSizes[level] < previousXLength - 1 and fogZoneSizes[level] < previousYLength - 1 then
 				-- all right, looks like it will fit
 				-- now we can even try to add "border" that is one cell wide, so that edges of previous level and new level don't touch
 				cellBorder = 0
-				if fogLevelSizes[level] < previousXLength - 2 and fogLevelSizes[level] < previousYLength - 2 then
+				if fogZoneSizes[level] < previousXLength - 2 and fogZoneSizes[level] < previousYLength - 2 then
 					DebugLog(2, "Level " .. tostring(level) .. " can get a cell-wide border")
 					cellBorder = 1
 				end
@@ -497,9 +601,9 @@ testBR.GenerateFogGrid = function(fogLevelSizes)
 
 			-- but now we need to determine what is the available area for the bottom left cell from which the whole level will be extrapolated from
 			-- we leave minX as it is, but we subtract level size from the maxX
-			availableCornerAreaX = {availableVerticalArea[1], availableVerticalArea[2] - fogLevelSizes[level]}
+			availableCornerAreaX = {availableVerticalArea[1], availableVerticalArea[2] - fogZoneSizes[level]}
 			-- same for Y
-			availableCornerAreaY = {availableHorisontalArea[1], availableHorisontalArea[2] - fogLevelSizes[level]}
+			availableCornerAreaY = {availableHorisontalArea[1], availableHorisontalArea[2] - fogZoneSizes[level]}
 			
 			-- choose random cell in the available area
 			newX = math.random(availableCornerAreaX[1],availableCornerAreaX[2])
@@ -508,9 +612,9 @@ testBR.GenerateFogGrid = function(fogLevelSizes)
 			-- save bottom left corner
 			table.insert(generatedFogGrid[level], {newX, newY})
 			-- save top right corner
-			table.insert(generatedFogGrid[level], {newX + fogLevelSizes[level], newY + fogLevelSizes[level]})
+			table.insert(generatedFogGrid[level], {newX + fogZoneSizes[level], newY + fogZoneSizes[level]})
 			DebugLog(2, "" .. tostring(level) .. " goes from " .. tostring(newX) .. ", " .. tostring(newY) .. " to " ..
-				tostring(newX + fogLevelSizes[level]) .. ", " .. tostring(newY + fogLevelSizes[level]))
+				tostring(newX + fogZoneSizes[level]) .. ", " .. tostring(newY + fogZoneSizes[level]))
 			-- lol no place to add the level. Who made this config?
 			else
 				tes3mp.LogMessage(2, "Given level size does not fit into previous level, skipping this one")
@@ -527,34 +631,53 @@ testBR.UpdateMap = function()
 	tes3mp.LogMessage(2, "Updating map to fog level " .. tostring(currentFogStage))
 	tes3mp.ClearMapChanges()
 
-	for levelIndex=1,#fogGridLimits do
-		-- at this point I am just banging code together until it works
-		-- got lucky with the first condition, added second condition in order to limit logic only to relevant levels
-		if levelIndex - currentFogStage < #fogDamageValues and fogDamageValues[currentFogStage - levelIndex] ~= nil then
-			DebugLog(2, "Level " .. tostring(levelIndex) .. " gets fog level " .. tostring(fogDamageValues[currentFogStage - levelIndex]))
-			
-			-- iterate through all cells in this level
-			for x=fogGridLimits[levelIndex][1][1],fogGridLimits[levelIndex][2][1] do
-				for y=fogGridLimits[levelIndex][1][2],fogGridLimits[levelIndex][2][2] do
-					-- actually, instead of using IsCell**Only**InLevel() we can avoid checking cells which obviously are in the level
-					-- instead, we just check if cells are not in the next level. Same thing that above mentioned function would do,
-					-- but we do it on smaller set of cells
-					-- so it's "is this the last level OR (is there next level AND cell is not part of next level)"
-					if not fogGridLimits[levelIndex+1] or (fogGridLimits[levelIndex+1] and not testBR.IsCellInLevel({x, y}, levelIndex+1)) then
-						tes3mp.LoadMapTileImageFile(x, y, fogFilePaths[currentFogStage - levelIndex])
-					end
-				end
-			end
-		end 
+	for zoneIndex=1,#fogGridLimits do
+        testBR.UpdateMapZone(zoneIndex)
 	end
 end
 
-testBR.GetCurrentDamageLevel = function(level)
-	tes3mp.LogMessage(2, "Looking up damage level for level " .. tostring(level))
-	if currentFogStage - level > #fogDamageValues then
+testBR.UpdateMapZone = function(zone)
+        DebugLog(2, "Updating map level" .. tostring(zone))
+
+	    for x=fogGridLimits[zone][1][1],fogGridLimits[zone][2][1] do
+		    for y=fogGridLimits[zone][1][2],fogGridLimits[zone][2][2] do
+                if not fogGridLimits[zone+1] or (fogGridLimits[zone+1] and not testBR.IsCellInZone({x, y}, zone+1)) then
+				    tes3mp.LoadMapTileImageFile(x, y, fogFilePaths[currentFogStage - zone])
+			    end
+            end
+        end
+
+
+
+		-- at this point I am just banging code together until it works
+		-- got lucky with the first condition, added second condition in order to limit logic only to relevant levels
+        -- because ideally max value for currentFogStage is #Fog
+--		if levelIndex - currentFogStage < #fogDamageValues and fogDamageValues[currentFogStage - levelIndex] ~= nil then
+--			DebugLog(2, "Level " .. tostring(levelIndex) .. " gets fog level " .. tostring(fogDamageValues[currentFogStage - levelIndex]))
+--            testBR.UpdateMapLevel(levelIndex)
+--		end
+end
+
+testBR.ChangeTilesTo = function(level)
+    DebugLog(3, "Updating tiles in map level " .. tostring(level))
+    -- iterate through all cells in this level
+	for x=fogGridLimits[level][1][1],fogGridLimits[level][2][1] do
+		for y=fogGridLimits[level][1][2],fogGridLimits[level][2][2] do
+			-- actually, instead of using IsCell**Only**InLevel() we can avoid checking cells which obviously are in the level
+			-- instead, we just check if cells are not in the next level. Same thing that above mentioned function would do,
+			-- but we do it on smaller set of cells
+			-- so it's "is this the last level OR (is there next level AND cell is not part of next level)"
+		end
+	end
+end
+
+-- zone is index in array
+testBR.GetCurrentDamageLevel = function(zone)
+	tes3mp.LogMessage(2, "Looking up damage level for zone " .. tostring(zone))
+	if currentFogStage - zone > #fogDamageValues then
 		return fogDamageValues[#fogDamageValues]
 	else
-		return fogDamageValues[currentFogStage - level]
+		return fogDamageValues[currentFogStage - zone]
 	end
 end
 
@@ -569,7 +692,9 @@ testBR.HandleAirMode = function()
     DebugLog(2, "Handling air mode. Current airmode = " .. tostring(airmode))
 
     for _, pid in pairs(playerList) do
-        testBR.SetAirMode(pid, airmode)
+        if Players[pid]:IsLoggedIn() then
+            testBR.SetAirMode(pid, airmode)
+        end
     end
     
 	airmode = airmode - 1
@@ -583,9 +708,13 @@ testBR.HandleAirMode = function()
 end
 
 -- check if player is last one
+-- this can be modified in case teams get implemented
 testBR.CheckVictoryConditions = function()
+    tes3mp.LogMessage(2, "Checking if victory conditions are met")
+    DebugLog(3, "#playerList: " .. tostring(#playerList))
 	if #playerList == 1 then
-		tes3mp.SendMessage(playerList[1], "Winner winner CHIM for dinner\n", false)
+		tes3mp.SendMessage(playerList[1], color.Yellow .. Players[pid].data.login.name .. " has won the match\n", true)
+        tes3mp.MessageBox(playerList[1], -1, "Winner winner CHIM for dinner")
 		Players[playerList[1]].data.BRinfo.wins = Players[playerList[1]].data.BRinfo.wins + 1
 		Players[playerList[1]]:Save()
         testBR.EndMatch()
@@ -612,30 +741,29 @@ testBR.IsCellExternal = function(cell)
     return true
 end
 
--- returns true if cell is part of level
-testBR.IsCellInLevel = function(cell, level)
-	DebugLog(4, "Checking if " .. tostring(cell[1]) .. ", " .. tostring(cell[2]) .. " is in level " .. tostring(level))
-	-- check if cell is in level range
-	if fogGridLimits[level] and testBR.IsCellInRange(cell, fogGridLimits[level][1], fogGridLimits[level][2]) then
+-- returns true if cell is within the zone
+testBR.IsCellInZone = function(cell, zone)
+	DebugLog(4, "Checking if " .. tostring(cell[1]) .. ", " .. tostring(cell[2]) .. " is in zone " .. tostring(zone))
+	-- check if cell within zone limits
+	if fogGridLimits[zone] and testBR.IsCellInRange(cell, fogGridLimits[zone][1], fogGridLimits[zone][2]) then
 		return true
 	end
 	return false
 end
 
 -- basically same function as above, only with added exclusivity check
--- returns true if cell is part of level
+-- returns true if cell is part of zone
 -- TODO: make this by implementing an "isExclusive" argument instead of having two seperate functions
-testBR.IsCellOnlyInLevel = function(cell, level)
-	DebugLog(2, "Checking if " .. tostring(cell[1]) .. ", " .. tostring(cell[2]) .. " is only in level " .. tostring(level))
-	-- check if cell is in level range
-	if fogGridLimits[level] and testBR.IsCellInRange(cell, fogGridLimits[level][1], fogGridLimits[level][2]) then
-		-- now watch this: check if further levels exist and that cell does not actually belong to that further level
-		if fogGridLimits[level+1] and testBR.IsCellInRange(cell, fogGridLimits[level+1][1], fogGridLimits[level+1][2]) then
-			return false
-		end		
-		return true
-	end
-	return false
+testBR.IsCellOnlyInZone = function(cell, zone)
+	DebugLog(2, "Checking if " .. tostring(cell[1]) .. ", " .. tostring(cell[2]) .. " is only in zone " .. tostring(zone))
+
+    if testBR.IsCellInZone(cell, zone) then
+        if testBR.IsCellInZone(cell, zone+1) then
+            return false
+        end
+        return true
+    end
+    return false
 end
 
 -- returns true if cell is inside the rectangle defined by given coordinates
@@ -655,24 +783,11 @@ testBR.QuickStart = function()
     DebugLog(2, "Doing QuickStart")
 	if debugLevel > 0 then
         for pid, player in pairs(Players) do
-            DebugLog(2, "Adding PID " .. tostring(pid))
-            testBR.AddPlayer(pid)
-            testBR.PlayerConfirmParticipation(pid)
+            if Players[pid]:IsLoggedIn() then
+                testBR.PlayerConfirmParticipation(pid)
+            end
         end		
 		testBR.StartMatch()
-	end
-end
-
--- end match and send everyone back to the lobby
-testBR.EndMatch = function()
-    -- Stop the shhrinking timer
-    tes3mp.StopTimer(fogTimer)
-    playerList = {}
-	for _, pid in pairs(playerList) do
-		-- remove player from match participants
-		--Players[pid].data.BRinfo.inMatch = 0
-		-- spawn player in lobby
-		testBR.SpawnPlayer(pid, true)
 	end
 end
 
@@ -690,55 +805,7 @@ testBR.ForceNextFog = function(pid)
 end
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- ====================== PLAYER-RELATED FUNCTIONS ======================
-
-
-testBR.AddPlayer = function(pid)
-	tes3mp.LogMessage(2, "Setting state for " .. tostring(pid))
-	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
-        table.insert(playerList, pid)
-        tes3mp.SendMessage(pid,"You joined the next match\n", false)
-	end
-end
 
 
 testBR.PlayerInit = function(pid)
@@ -794,13 +861,23 @@ testBR.PlayerItems = function(pid)
 	
 end
 
+testBR.PlayerStartMatchProposal = function(pid)
+    if pid ~= nil then
+        tes3mp.SendMessage(pid, "New match will start if all participants are ready. Type /ready to confirm.\n", true)
+        testBR.StartMatchProposal()
+        -- if match proposal started then mark the player who started the proposal as first participant
+        if matchProposalInProgress then
+            testBR.PlayerConfirmParticipation(pid)
+        end
+    end
+end
 
 testBR.PlayerConfirmParticipation = function(pid)
 	--if matchProposalInProgress and Players[pid] ~= nil and Players[pid]:IsLoggedIn() then IsInList(pid, playerList) then
     -- TODO: figure out proper criteria for this
-    if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
+    if Players[pid] ~= nil and Players[pid]:IsLoggedIn() and not IsInList(pid, readyList) then
         table.insert(readyList, pid)
-		tes3mp.SendMessage(pid, color.Yellow .. Players[pid].data.login.name .. " is ready.\n", false)
+		tes3mp.SendMessage(pid, color.Yellow .. Players[pid].data.login.name .. " is ready.\n", true)
 	end
 end
 
@@ -850,7 +927,7 @@ testBR.ProcessCellChange = function(pid)
 		--tes3mp.SendWorldMap(pid)
 		Players[pid]:SaveStatsDynamic()
 		Players[pid]:Save()
-        testBR.CheckCellDamageLevel(pid)
+        testBR.UpdateDamageLevel(pid)
 	end
 end
 
@@ -864,7 +941,7 @@ testBR.SpawnPlayer = function(pid, spawnInLobby)
 		random_x = math.random(-40000,80000)
 		random_y = math.random(-40000,120000)
 		tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " at " .. tostring(random_x) .. ", " .. tostring(random_y))
-		chosenSpawnPoint = {"1, 1", random_x, random_y, 30000, 0}
+		chosenSpawnPoint = {"1, 1", random_x, random_y, 40000, 0}
 	end
 
 	tes3mp.SetCell(pid, chosenSpawnPoint[1])
@@ -921,7 +998,7 @@ testBR.DropItem = function(pid, index, z_offset)
 	table.insert(LoadedCells[cell].data.packets.place, refIndex)
 	DebugLog(2, "Sending data to other players")
 	for onlinePid, player in pairs(Players) do
-		if player:IsLoggedIn() then
+		if Players[pid]:IsLoggedIn() then
 			tes3mp.InitializeEvent(onlinePid)
 			tes3mp.SetEventCell(cell)
 			tes3mp.SetObjectRefId(refId)
@@ -937,9 +1014,6 @@ testBR.DropItem = function(pid, index, z_offset)
 	end
 	LoadedCells[cell]:Save()
 end
-
-
-
 
 testBR.SetFogDamageLevel = function(pid, level)
 	tes3mp.LogMessage(2, "Setting damage level for PID " .. tostring(pid))
@@ -962,16 +1036,6 @@ testBR.SetFogDamageLevel = function(pid, level)
 	end
 end
 
-
-
-
-
-
-
-
-
-
-
 testBR.SendMapToPlayer = function(pid)
 	tes3mp.LogMessage(2, "Sending map to PID " .. tostring(pid))
 	tes3mp.SendWorldMap(pid)
@@ -985,8 +1049,8 @@ end
 testBR.ProcessDeath = function(pid)
 	if IsInList(pid, playerList) then
 		testBR.DropAllItems(pid)
-		table.remove(playerList, pid)
-		testBR.CheckVictoryConditions(pid)
+        RemoveFromList(pid, playerList)
+		testBR.CheckVictoryConditions()
 	end
 	testBR.SpawnPlayer(pid, true)
 	testBR.SetFogDamageLevel(pid, 0)
@@ -1119,6 +1183,19 @@ end)
 customEventHooks.registerHandler("OnPlayerFinishLogin", function(eventStatus, pid)
 	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
 		testBR.VerifyPlayerData(pid)
+        -- check if player count is high enough to start automatic process
+        if automaticMatchmaking then
+            testBR.StartMatchProposal()
+        end
+	end
+end)
+
+customEventHooks.registerHandler("OnPlayerDisconnect", function(eventStatus, pid)
+	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
+        if IsInList(pid, playerList) then
+		    RemoveFromList(pid, playerList)
+		    testBR.CheckVictoryConditions(pid)
+        end
 	end
 end)
 
@@ -1166,9 +1243,8 @@ customEventHooks.registerValidator("OnPlayerCellChange", function(eventStatus, p
 end)
 
 customCommandHooks.registerCommand("newmatch", testBR.StartMatchProposal)
-customCommandHooks.registerCommand("forcestart", testBR.StartMatch)
-customCommandHooks.registerCommand("join", testBR.AddPlayer)
 customCommandHooks.registerCommand("ready", testBR.PlayerConfirmParticipation)
+customCommandHooks.registerCommand("forcestart", testBR.StartMatch)
 customCommandHooks.registerCommand("forcenextfog", AdvanceFog)
 customCommandHooks.registerCommand("forceend", testBR.AdminEndMatch)
 customCommandHooks.registerCommand("x", testBR.QuickStart)
