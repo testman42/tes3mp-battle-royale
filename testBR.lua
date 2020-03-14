@@ -1,6 +1,6 @@
 
 -- Battle Royale game mode by testman
--- v0.2
+-- v0.5
 
 -- TODO:
 -- find a decent name for overall project
@@ -10,12 +10,11 @@
 -- - order functions in the order that makes sense
 -- -- figure out how to make timers execute functions with given arguments instead of relying on global variables
 -- figure out how the zone-shrinking logic should actually work
--- implement said decent zone-shrinking logic
+-- - implement said decent zone-shrinking logic
 -- - make shrinking take some time instead of being an instant event
 -- - make zone circle-shaped (or at least blocky pixelated circle shaped)
 -- make players unable to open vanilla containers
 -- implement custom containers that can be opened by players
--- make players start taking damage if they are in a cell that turned into a non-safe cell
 -- clear inventory
 -- think about restore fatigue constant effect
 -- resend map to rejoining player
@@ -103,7 +102,7 @@ testBR = {}
 
 -- print out a lot more messages about what script is doing
 -- TODO: properly define debug levels
-debugLevel = 3
+debugLevel = 0
 
 -- how fast time passes
 -- you will most likely want this to be very low in order to have skybox remain the same
@@ -134,14 +133,14 @@ fogFilePaths = {fogWarnFilePath, fog1FilePath, fog2FilePath, fog3FilePath}
 -- default stats for players
 defaultStats = {
 playerLevel = 1,
-playerAttributes = 75,
-playerSkills = 75,
+playerAttributes = 80,
+playerSkills = 80,
 playerHealth = 100,
 playerMagicka = 100,
 playerFatigue = 300,
 playerLuck = 100,
-playerSpeed = 75,
-playerAcrobatics = 50,
+playerSpeed = 100,
+playerAcrobatics = 75,
 playerMarksman = 150
 }
 
@@ -149,9 +148,9 @@ playerMarksman = 150
 -- config that determines how the fog will behave 
 fogZoneSizes = {"all", 20, 15, 10, 5, 3, 1}
 
---fogStageDurations = {6000, 3000, 240, 120, 120, 60, 60, 0}
+fogStageDurations = {6000, 3000, 240, 120, 120, 60, 60, 0}
 --fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
-fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
+--fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
 -- determines the order of how levels increase damage
 -- TODO: Would it make more sense to abandon this and instead map values to integers
@@ -198,6 +197,7 @@ fogName = "Blight storm"
 -- 30 should be enough to fall to any ground safely
 -- TODO: does anyone want this to be in ascending order? We could use #airDropStageTimes - airmode + 1 to achieve this.
 airDropStageTimes = {35, 25}
+--airDropStageTimes = {35, 2500}
 
 -- ====================== GLOBAL VARIABLES ======================
 
@@ -244,6 +244,13 @@ math.randomseed(os.time())
 function DebugLog(requiredDebugLevel, message)
 	if debugLevel >= requiredDebugLevel then
 		tes3mp.LogMessage(2, message)
+	end
+end
+
+-- used to easily regulate the level of information when debugging
+function DebugMessage(requiredDebugLevel, pid, message)
+	if debugLevel >= requiredDebugLevel then
+		tes3mp.SendMessage(pid, message, true)
 	end
 end
 
@@ -375,11 +382,14 @@ testBR.StartMatch = function()
 
     testBR.StartFogShrink()
 
+    testBR.ResetMapTiles()
+
 	testBR.ResetWorld()
 
     DebugLog(2, "playerList has " .. tostring(#playerList) .. " PIDs in it")
 	for _, pid in pairs(playerList) do
         if Players[pid]:IsLoggedIn() then
+            tes3mp.SendWorldMap(pid)
             testBR.PlayerInit(pid)
         else
             RemoveFromList(pid, playerList)
@@ -399,6 +409,7 @@ testBR.EndMatch = function()
 	for _, pid in pairs(playerList) do
         if Players[pid]:IsLoggedIn() then
 		    testBR.SpawnPlayer(pid, true)
+            testBR.SetFogDamageLevel(pid, 0)
         end
 	end
     playerList = {}
@@ -450,8 +461,10 @@ end
 -- TODO: make it so that damage level doesn't get cleared and re-applied on every cell transition
 testBR.UpdateDamageLevel = function(pid)
 	tes3mp.LogMessage(2, "Updating damage level for PID " .. tostring(pid))
-	playerCell = Players[pid].data.location.cell
+    -- playerCel = Players[pid].data.location.cell
+	playerCell = tes3mp.GetCell(pid)
 	DebugLog(3, "playerCell for PID " .. tostring(pid) .. ": " .. tostring(playerCell))
+    
 
     -- sanity check
     if not testBR.IsCellExternal(playerCell) then
@@ -460,9 +473,13 @@ testBR.UpdateDamageLevel = function(pid)
     end
 
 	newDamageLevel = testBR.CheckCellDamageLevel(playerCell)
+
+    DebugMessage(3, pid, "cell: " .. playerCell .. " dl: " .. tostring(newDamageLevel) .. "\n")
 	
 	if not newDamageLevel then
 		testBR.SetFogDamageLevel(pid, 0)
+    else
+        testBR.SetFogDamageLevel(pid, newDamageLevel)
 	end
 end
 
@@ -470,16 +487,17 @@ end
 testBR.CheckCellDamageLevel = function(cell)
 	tes3mp.LogMessage(2, "Checking damage level for cell " .. tostring(cell))
 
-    damageLevel = nil
+    damageLevel = 0
 
     -- sanity check
     if not testBR.IsCellExternal(cell) then
         tes3mp.LogMessage(2, tostring(cell) .. " is not external cell and therefore can't have damage level.")
-        return nil
+        return 0
     end
     
 	-- danke StackOverflow
-	x, y = playerCell:match("([^,]+),([^,]+)")
+	--x, y = playerCell:match("([^,]+),([^,]+)")
+	x, y = cell:match("([^,]+),([^,]+)")
 
 	for level=1,#fogGridLimits do
 		DebugLog(2, "GetCurrentDamageLevel: " .. tostring(testBR.GetCurrentDamageLevel(level)))
@@ -488,9 +506,8 @@ testBR.CheckCellDamageLevel = function(cell)
 		DebugLog(3, "cell only in level: " .. tostring(testBR.IsCellOnlyInZone({tonumber(x), tonumber(y)}, level)))
 		if tonumber(testBR.GetCurrentDamageLevel(level)) and tonumber(x) and tonumber(y)
         and testBR.IsCellOnlyInZone({tonumber(x), tonumber(y)}, level) then
-			testBR.SetFogDamageLevel(pid, testBR.GetCurrentDamageLevel(level))
-			foundLevel = true
-			DebugLog(2, "Damage level for PID " .. tostring(pid) .. " is set to " .. tostring(testBR.GetCurrentDamageLevel(level)))
+            damageLevel = testBR.GetCurrentDamageLevel(level)
+			DebugLog(2, "Damage level for cell " .. tostring(cell) .. " is set to " .. tostring(damageLevel))
 			break
 		end
 	end
@@ -515,9 +532,13 @@ end
 
 testBR.StartFogTimer = function(delay)
 	tes3mp.LogMessage(2, "Setting shrink timer to " .. tostring(delay) .. " seconds")
-	tes3mp.SendMessage(0,fogName .. " will be shrinking in " .. tostring(delay) .. " seconds.\n", true)
-	fogTimer = tes3mp.CreateTimerEx("AdvanceFog", time.seconds(delay), "i", 1)
-	tes3mp.StartTimer(fogTimer)
+    -- sanity check
+    -- TODO: figure out why delay can be nil
+    if delay then
+	    tes3mp.SendMessage(0,fogName .. " will be shrinking in " .. tostring(delay) .. " seconds.\n", true)
+	    fogTimer = tes3mp.CreateTimerEx("AdvanceFog", time.seconds(delay), "i", 1)
+	    tes3mp.StartTimer(fogTimer)
+    end
 end
 
 -- delay is for how long timer will last
@@ -637,38 +658,29 @@ testBR.UpdateMap = function()
 end
 
 testBR.UpdateMapZone = function(zone)
-        DebugLog(2, "Updating map level" .. tostring(zone))
+    DebugLog(2, "Updating map level" .. tostring(zone))
 
-	    for x=fogGridLimits[zone][1][1],fogGridLimits[zone][2][1] do
-		    for y=fogGridLimits[zone][1][2],fogGridLimits[zone][2][2] do
-                if not fogGridLimits[zone+1] or (fogGridLimits[zone+1] and not testBR.IsCellInZone({x, y}, zone+1)) then
-				    tes3mp.LoadMapTileImageFile(x, y, fogFilePaths[currentFogStage - zone])
-			    end
-            end
+    for x=fogGridLimits[zone][1][1],fogGridLimits[zone][2][1] do
+	    for y=fogGridLimits[zone][1][2],fogGridLimits[zone][2][2] do
+            if not fogGridLimits[zone+1] or (fogGridLimits[zone+1] and not testBR.IsCellInZone({x, y}, zone+1)) then
+			    tes3mp.LoadMapTileImageFile(x, y, fogFilePaths[currentFogStage - zone])
+		    end
         end
-
-
-
-		-- at this point I am just banging code together until it works
-		-- got lucky with the first condition, added second condition in order to limit logic only to relevant levels
-        -- because ideally max value for currentFogStage is #Fog
---		if levelIndex - currentFogStage < #fogDamageValues and fogDamageValues[currentFogStage - levelIndex] ~= nil then
---			DebugLog(2, "Level " .. tostring(levelIndex) .. " gets fog level " .. tostring(fogDamageValues[currentFogStage - levelIndex]))
---            testBR.UpdateMapLevel(levelIndex)
---		end
+    end
 end
 
-testBR.ChangeTilesTo = function(level)
-    DebugLog(3, "Updating tiles in map level " .. tostring(level))
-    -- iterate through all cells in this level
-	for x=fogGridLimits[level][1][1],fogGridLimits[level][2][1] do
-		for y=fogGridLimits[level][1][2],fogGridLimits[level][2][2] do
-			-- actually, instead of using IsCell**Only**InLevel() we can avoid checking cells which obviously are in the level
-			-- instead, we just check if cells are not in the next level. Same thing that above mentioned function would do,
-			-- but we do it on smaller set of cells
-			-- so it's "is this the last level OR (is there next level AND cell is not part of next level)"
-		end
-	end
+-- replace zone-marking tiles with the normal ones
+testBR.ResetMapTiles = function()
+	tes3mp.LogMessage(2, "Resetting map tiles")
+	tes3mp.ClearMapChanges()
+
+	for x=mapBorders[1][1],mapBorders[2][1] do
+	    for y=mapBorders[1][2],mapBorders[2][2] do
+            DebugLog(4, "Refreshing tile " .. x .. ", " .. y )
+            filePath = tes3mp.GetDataPath() .. "/map/" .. x .. ", " .. y .. ".png"
+            tes3mp.LoadMapTileImageFile(x, y, filePath)
+        end
+    end
 end
 
 -- zone is index in array
@@ -713,7 +725,7 @@ testBR.CheckVictoryConditions = function()
     tes3mp.LogMessage(2, "Checking if victory conditions are met")
     DebugLog(3, "#playerList: " .. tostring(#playerList))
 	if #playerList == 1 then
-		tes3mp.SendMessage(playerList[1], color.Yellow .. Players[pid].data.login.name .. " has won the match\n", true)
+		tes3mp.SendMessage(playerList[1], color.Yellow .. Players[playerList[1]].data.login.name .. " has won the match\n", true)
         tes3mp.MessageBox(playerList[1], -1, "Winner winner CHIM for dinner")
 		Players[playerList[1]].data.BRinfo.wins = Players[playerList[1]].data.BRinfo.wins + 1
 		Players[playerList[1]]:Save()
@@ -804,6 +816,44 @@ testBR.ForceNextFog = function(pid)
 	end
 end
 
+testBR.FillMapTiles = function(pid)
+    if debugLevel > 0 then
+        testBR.ResetMapTiles()
+        testBR.SendMapToPlayer(pid)
+    end
+end
+
+-- ====================== MISC UTILITY USED ONLY ONCE FUNCTION ======================
+
+-- this makes player move through mosts of the external cells automatically
+-- it's just a lefover, but I left it here for archiving purposes
+-- values for x and y and multipliers are far from optinally configured
+-- meaning that player can go through same set of cells more than once
+-- I ran this in background while doing other productive stuff
+testBR.GenerateMapTiles = function(pid)
+	tes3mp.LogMessage(2, "Spawning player " .. tostring(pid))
+    if debugLevel > 0 and Players[pid]:IsAdmin() then
+        for x=-20,40 do
+            for y=-20,40 do
+                if Players[pid]:IsLoggedIn() then
+		            tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " at " .. tostring(random_x) .. ", " .. tostring(random_y))
+		            spawnPoint = {"1, 1", x*4500, y*6000, 40000, 0}
+
+                    tes3mp.SetCell(pid, spawnPoint[1])
+                    tes3mp.SendCell(pid)
+                    tes3mp.SetPos(pid, spawnPoint[2], spawnPoint[3], spawnPoint[4])
+                    tes3mp.SetRot(pid, 0, spawnPoint[5])
+                    tes3mp.SendPos(pid)
+                    -- so that client has time to load cell, generate image and send it to server
+                    -- works on on operating systems where "sleep" is a valid command
+                    os.execute("sleep 0.5")
+                else
+                    return 0       
+                end
+            end
+        end
+    end
+end
 
 -- ====================== PLAYER-RELATED FUNCTIONS ======================
 
@@ -875,7 +925,7 @@ end
 testBR.PlayerConfirmParticipation = function(pid)
 	--if matchProposalInProgress and Players[pid] ~= nil and Players[pid]:IsLoggedIn() then IsInList(pid, playerList) then
     -- TODO: figure out proper criteria for this
-    if Players[pid] ~= nil and Players[pid]:IsLoggedIn() and not IsInList(pid, readyList) then
+    if Players[pid] ~= nil and Players[pid]:IsLoggedIn() and not IsInList(pid, readyList) and not matchInProgress then
         table.insert(readyList, pid)
 		tes3mp.SendMessage(pid, color.Yellow .. Players[pid].data.login.name .. " is ready.\n", true)
 	end
@@ -1248,5 +1298,7 @@ customCommandHooks.registerCommand("forcestart", testBR.StartMatch)
 customCommandHooks.registerCommand("forcenextfog", AdvanceFog)
 customCommandHooks.registerCommand("forceend", testBR.AdminEndMatch)
 customCommandHooks.registerCommand("x", testBR.QuickStart)
+customCommandHooks.registerCommand("generatemaptiles", testBR.GenerateMapTiles)
+customCommandHooks.registerCommand("fillmap", testBR.FillMapTiles)
 
 return testBR
