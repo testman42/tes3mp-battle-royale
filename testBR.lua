@@ -7,6 +7,8 @@
 -- untangle all the spaghetti code
 -- - A LOT OF IT
 -- -- HOLY SHIT I CAN'T STRESS ENOUGH HOW MUCH FIXING AND IMPROVING THIS CODE NEEDS
+-- - also comment whole thing much better
+-- - should this slowly get split into multiple files?
 -- - order functions in the order that makes sense
 -- -- figure out how to make timers execute functions with given arguments instead of relying on global variables
 -- figure out how the zone-shrinking logic should actually work
@@ -23,7 +25,7 @@
 -- implement hybrid playerzone shrinking system:
 -- - use cell based system at the start
 -- - switch to coordinates-math-distance-circle at the end
--- longer drop speed boost time
+-- maybe make player unable to drop items?
 -- implement a config option that determines if server will use 2-step match initiation (/newmatch and then /ready) or just one (just /ready)
 -- - read: do we even want everyone on server to participate in round or do we allow them to "sit a round out"?
 -- - will use a single step match creation logic for now. Figure out proper two-step match creation mechanics in this time.
@@ -98,7 +100,7 @@ fogStage - basically index of fog progress
 -- TODO: find a decent name
 testBR = {}
 
--- ====================== CONFIG ======================
+-- ====================== CONFIG SECTION ======================
 
 -- print out a lot more messages about what script is doing
 -- TODO: properly define debug levels
@@ -122,6 +124,9 @@ debugLevel = 0
 
 -- Determines if it is possible to use different presets of equipment / stats 
 --allowClasses = true
+
+-- Determines if players are allowed to move into cells that are not part of exterior
+-- allowEnteringInteriorCells = false
 
 -- define image files for map
 fogWarnFilePath = tes3mp.GetDataPath() .. "/map/fogwarn.png"
@@ -148,7 +153,7 @@ playerMarksman = 150
 -- config that determines how the fog will behave 
 fogZoneSizes = {"all", 20, 15, 10, 5, 3, 1}
 
-fogStageDurations = {6000, 3000, 240, 120, 120, 60, 60, 0}
+fogStageDurations = {500, 400, 240, 120, 90, 60, 30, 0}
 --fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
 --fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
@@ -298,7 +303,7 @@ end
 
 -- ====================== MATCH-RELATED FUNCTIONS =====================
 
---
+-- Advances the shrinking process for one phase 
 function AdvanceFog()
 	tes3mp.SendMessage(0,fogName .. " is shrinking.\n", true)
 	currentFogStage = currentFogStage + 1
@@ -317,12 +322,13 @@ function AdvanceFog()
 	end
 end
 
-
+-- Used to initiate next step of the air-drop process
 function HandleAirTimerTimeout()
     DebugLog(2, "AirTimer Timeout")
     testBR.HandleAirMode()
 end
 
+-- Used to handle the warnings related to the zone-shrinking process
 function HandleShrinkTimerAlertTimeout()
 	for _, pid in pairs(playerList) do
         if Players[pid]:IsLoggedIn() then
@@ -349,6 +355,7 @@ function HandleShrinkTimerAlertTimeout()
 	end
 end
 
+-- Evaluates if the new match should be started and starts it if criteria is met
 function EndMatchProposal()
 	tes3mp.LogMessage(2, "Ending current match proposal")
     matchProposalInProgress = false
@@ -373,7 +380,7 @@ testBR.OnServerPostInit = function()
     end
 end
 
---
+-- Initiates the battle royale match for players who decided to participate
 testBR.StartMatch = function()
 	matchID = os.time()
 	tes3mp.LogMessage(2, "Starting a battle royale match with ID " .. tostring(matchID))
@@ -515,7 +522,7 @@ testBR.CheckCellDamageLevel = function(cell)
 	return damageLevel
 end
 
-
+-- Start the process of decreasing safe area
 testBR.StartFogShrink = function()
     fogGridLimits = testBR.GenerateFogGrid(fogZoneSizes)
     DebugLog(2, "fogGridLimits is an array with " .. tostring(#fogGridLimits) .. " elements")
@@ -540,15 +547,6 @@ testBR.StartFogTimer = function(delay)
 	    tes3mp.StartTimer(fogTimer)
     end
 end
-
--- delay is for how long timer will last
---[[
-testBR.StartShrinkAlertTimer = function(delay)
-	tes3mp.LogMessage(2, "Setting shrink timer alert for " .. tostring(delay) .. " seconds")
-	shrinkAlertTimer = tes3mp.CreateTimerEx("HandleShrinkTimerAlertTimeout", time.seconds(delay), "i", 1)
-	tes3mp.StartTimer(shrinkAlertTimer)
-end 
-]]
 
 -- start a timer 
 testBR.StartShrinkAlertTimer = function(stage)
@@ -648,6 +646,7 @@ testBR.GenerateFogGrid = function(fogZoneSizes)
 	return generatedFogGrid
 end
 
+-- Send new world-map tiles to players
 testBR.UpdateMap = function()
 	tes3mp.LogMessage(2, "Updating map to fog level " .. tostring(currentFogStage))
 	tes3mp.ClearMapChanges()
@@ -657,6 +656,7 @@ testBR.UpdateMap = function()
 	end
 end
 
+-- Load map tiles for specific zone
 testBR.UpdateMapZone = function(zone)
     DebugLog(2, "Updating map level" .. tostring(zone))
 
@@ -669,7 +669,7 @@ testBR.UpdateMapZone = function(zone)
     end
 end
 
--- replace zone-marking tiles with the normal ones
+-- replace the current zone-marking tiles with the normal (vanilla) ones
 testBR.ResetMapTiles = function()
 	tes3mp.LogMessage(2, "Resetting map tiles")
 	tes3mp.ClearMapChanges()
@@ -683,6 +683,7 @@ testBR.ResetMapTiles = function()
     end
 end
 
+-- Returns the value that is used to determine how much damage the cells in that zone currently deal
 -- zone is index in array
 testBR.GetCurrentDamageLevel = function(zone)
 	tes3mp.LogMessage(2, "Looking up damage level for zone " .. tostring(zone))
@@ -693,10 +694,13 @@ testBR.GetCurrentDamageLevel = function(zone)
 	end
 end
 
+-- Start the first stage of the air-drop process
 testBR.StartAirdrop	= function()
     DebugLog(2, "Starting airdrop")
     airmode = 2
 	testBR.HandleAirMode()
+    -- inform all players about the duration of fast movement
+    tes3mp.SendMessage(playerList[1], "You have " .. airDropStageTimes[2] .. " seconds of speed boost.\n", true)
 end
 
 -- make effects get applied to players and set timer if needed
@@ -803,19 +807,21 @@ testBR.QuickStart = function()
 	end
 end
 
+-- Administrative function to forcefully end match
 testBR.AdminEndMatch = function(pid)
 	if Players[pid]:IsAdmin() then
 		testBR.EndMatch()
 	end
 end
 
-
+-- force the next stage of shrinking process regardless of the remaining time
 testBR.ForceNextFog = function(pid)
 	if #fogStageDurations >= currentFogStage + 1 then
 		AdvanceFog()
 	end
 end
 
+-- used to manually clear map
 testBR.FillMapTiles = function(pid)
     if debugLevel > 0 then
         testBR.ResetMapTiles()
@@ -857,7 +863,7 @@ end
 
 -- ====================== PLAYER-RELATED FUNCTIONS ======================
 
-
+-- Set up all the things that player needs at the start of the match
 testBR.PlayerInit = function(pid)
 	tes3mp.LogMessage(2, "Starting initial setup for PID " .. tostring(pid))
 	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() and IsInList(pid, playerList) then
@@ -874,6 +880,7 @@ testBR.PlayerInit = function(pid)
 	end
 end
 
+-- Manage the spells and effects for player
 testBR.PlayerSpells = function(pid)
 	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
 		Players[pid].data.spellbook = {}
@@ -884,6 +891,7 @@ testBR.PlayerSpells = function(pid)
 	end
 end
 
+-- Manage items that player has
 testBR.PlayerItems = function(pid)
 	testBR.LoadPlayerItems(pid)
 end
@@ -906,11 +914,12 @@ end
 --end
 
 
--- TODO: for player clothes
+-- TODO: for player items
 testBR.PlayerItems = function(pid)
 	
 end
 
+-- Used by players to start a new match proposal
 testBR.PlayerStartMatchProposal = function(pid)
     if pid ~= nil then
         tes3mp.SendMessage(pid, "New match will start if all participants are ready. Type /ready to confirm.\n", true)
@@ -922,6 +931,7 @@ testBR.PlayerStartMatchProposal = function(pid)
     end
 end
 
+-- Used by players to enlist themselves as participants in the next match
 testBR.PlayerConfirmParticipation = function(pid)
 	--if matchProposalInProgress and Players[pid] ~= nil and Players[pid]:IsLoggedIn() then IsInList(pid, playerList) then
     -- TODO: figure out proper criteria for this
@@ -931,11 +941,9 @@ testBR.PlayerConfirmParticipation = function(pid)
 	end
 end
 
-
-
 -- set airborne-related effects
 -- 1 = just slowfall
--- 2 = slowfall and speed
+-- 2 = slowfall and speed boost
 testBR.SetAirMode = function(pid, mode)
 	DebugLog(2, "Setting air mode to " .. tostring(mode) .. " for PID " .. tostring(pid))
 	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
@@ -976,12 +984,12 @@ testBR.ProcessCellChange = function(pid)
 		-- TODO: lol I have no idea how to properly re-paint a tile after player "discovered it"
 		--tes3mp.SendWorldMap(pid)
 		Players[pid]:SaveStatsDynamic()
-		Players[pid]:Save()
+		--Players[pid]:Save()
         testBR.UpdateDamageLevel(pid)
 	end
 end
 
-
+-- Set's player position 
 testBR.SpawnPlayer = function(pid, spawnInLobby)
 	tes3mp.LogMessage(2, "Spawning player " .. tostring(pid))
 	if spawnInLobby then
@@ -1001,6 +1009,7 @@ testBR.SpawnPlayer = function(pid, spawnInLobby)
 	tes3mp.SendPos(pid)
 end
 
+-- Have player drop all items when they get killed while in match
 testBR.DropAllItems = function(pid)
 	tes3mp.LogMessage(2, "Dropping all items for PID " .. tostring(pid))
 
@@ -1065,6 +1074,7 @@ testBR.DropItem = function(pid, index, z_offset)
 	LoadedCells[cell]:Save()
 end
 
+-- Apply given damage effect to player
 testBR.SetFogDamageLevel = function(pid, level)
 	tes3mp.LogMessage(2, "Setting damage level for PID " .. tostring(pid))
 	if level == 0 then
@@ -1086,6 +1096,7 @@ testBR.SetFogDamageLevel = function(pid, level)
 	end
 end
 
+-- Send all the new changes to world-view map to player
 testBR.SendMapToPlayer = function(pid)
 	tes3mp.LogMessage(2, "Sending map to PID " .. tostring(pid))
 	tes3mp.SendWorldMap(pid)
@@ -1096,6 +1107,7 @@ testBR.OnCellLoad = function(pid)
 
 end
 
+-- Handle player death
 testBR.ProcessDeath = function(pid)
 	if IsInList(pid, playerList) then
 		testBR.DropAllItems(pid)
@@ -1108,6 +1120,7 @@ testBR.ProcessDeath = function(pid)
 	Players[pid]:Save()
 end
 
+-- Add battle-royale specific data to player file if it is not already present
 testBR.VerifyPlayerData = function(pid)
 	tes3mp.LogMessage(2, "Verifying player data for " .. tostring(Players[pid]))
 	
@@ -1181,6 +1194,7 @@ testBR.ResetCharacter = function(pid)
 	--tes3mp.LogMessage(2, "Dynamic stats loaded")
 end
 
+-- Handle generation of new character
 testBR.EndCharGen = function(pid)
 	tes3mp.LogMessage(2, "Ending character generation for " .. tostring(pid))
 	Players[pid]:SaveLogin()
@@ -1210,9 +1224,11 @@ testBR.validateCell = function(pid)
 		Players[pid].data.location.posX = tes3mp.GetPreviousCellPosX(pid)
 		Players[pid].data.location.posY = tes3mp.GetPreviousCellPosY(pid)
 		Players[pid].data.location.posZ = tes3mp.GetPreviousCellPosZ(pid)
-		Players[pid]:LoadCell()
+        Players[pid]:LoadCell()
         return false
     end
+    
+    return true
 end
 
 
@@ -1271,6 +1287,9 @@ customEventHooks.registerHandler("OnPlayerEndCharGen", function(eventstatus, pid
 	if Players[pid] ~= nil then
 		tes3mp.LogMessage(2, "++++ Newly created: " .. tostring(pid))
 		testBR.EndCharGen(pid)
+        if automaticMatchmaking then
+            testBR.StartMatchProposal()
+        end
 	end
 end)
 
