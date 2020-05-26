@@ -1,0 +1,23 @@
+{
+  "general":{
+    "currentGeneratedNum":1
+  },
+  "permanentRecords":{
+    "fog_border":{
+      "name":"",
+      "value":10,
+      "weight":20,
+      "icon":"m\\misc_dwrv_gear00.tga",
+      "model":"x\\Ex_GG_fence_s_02.nif"
+    }
+  },
+  "generatedRecords":{
+  },
+  "recordLinks":{
+    "$custom_miscellaneous_1":{
+      "players":["testman"],
+      "cells":["-14, 10","-10, 11"]
+    }
+  },
+  "unlinkedRecordsToCheck":[]
+}

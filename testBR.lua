@@ -1,6 +1,10 @@
 
 -- Battle Royale game mode by testman
--- v0.5
+-- v0.6
+
+
+-- MAXIMUM TODO:
+-- as soon as this project is functional and published, figure out how to elegantly split this huge file into smaller files
 
 -- TODO:
 -- find a decent name for overall project
@@ -11,6 +15,7 @@
 -- - should this slowly get split into multiple files?
 -- - order functions in the order that makes sense
 -- -- figure out how to make timers execute functions with given arguments instead of relying on global variables
+-- - networking optimisations. (stop clogging up server by making massive packet spikes)
 -- figure out how the zone-shrinking logic should actually work
 -- - implement said decent zone-shrinking logic
 -- - make shrinking take some time instead of being an instant event
@@ -19,8 +24,6 @@
 -- implement custom containers that can be opened by players
 -- clear inventory
 -- think about restore fatigue constant effect
--- resend map to rejoining player
--- - lolwat no, disconnecting should count the same as getting killed, and player should respawn in lobby after reconnecting
 -- make sure to clear spells
 -- implement hybrid playerzone shrinking system:
 -- - use cell based system at the start
@@ -34,7 +37,7 @@
 -- - Renaming all to "match" for now just for consistency, can Ctrl+H it later
 -- decide on what should always be part of a log and what should be just debug message
 -- - properly define debug levels
-
+-- - warning messages about game mechanics (eg. "In this match you can not enter interiors"
 --[[
 
 =================== DESIGN DOCUMENT PART ===================
@@ -69,6 +72,7 @@ fog - the thing that battle royale games have. It shrinks over time and damages 
 fogGridLimits - an array that contains the bottom left (min X and min Y) and top right (max X and max Y) for each level
 
 fog grid - Currently used logic is square-based, but same principle could easily work for other shapes, preferably circle (https://en.wikipedia.org/wiki/Midpoint_circle_algorithm)
+(and https://www.ques10.com/p/10771/explain-the-midpoint-circle-generating-algorithm-1/)
 Whole area gets segmented when the match starts, so that it doesn't have to determine each new zone when fog starts shrinking
 Below example is for grid with 4 levels. Each time fog shrinks, it moves one level in. and all cells in that area start dealing damage to player
 
@@ -88,6 +92,11 @@ Below example is for grid with 4 levels. Each time fog shrinks, it moves one lev
 |                              |
 #------------------------------+
 (# represents the coordinates that are saved in array, + and the lines are extrapolated from the given two cells)
+
+Distance between cells is exactly 8192 units
+https://wiki.openmw.org/index.php?title=Measurement_Units
+
+scale for fog_border to fit across whole length of a cell is 2.677
 
 fogZone - one set of cells. It is used to easily determine if cell that player entered should cause damage to player or not.
 -- TODO: this needs to be renamed to "zone" or something like it, because overuse of the term "level" in this script is getting out of hand
@@ -153,7 +162,9 @@ playerMarksman = 150
 -- config that determines how the fog will behave 
 fogZoneSizes = {"all", 20, 15, 10, 5, 3, 1}
 
+-- Actual attempt
 fogStageDurations = {500, 400, 240, 120, 90, 60, 30, 0}
+-- Debug durations, first one for automatic quick iteration, second one for manual control
 --fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
 --fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
@@ -200,8 +211,9 @@ fogName = "Blight storm"
 -- since airmode gets decreased over time, this array gets used from last value to first
 -- 15 is about how much time it takes to fall from spawn to the top of Red Mountain. 
 -- 30 should be enough to fall to any ground safely
+-- - apparenlty it is not because of some networking / performance thing. 40 should really be enough though
 -- TODO: does anyone want this to be in ascending order? We could use #airDropStageTimes - airmode + 1 to achieve this.
-airDropStageTimes = {35, 25}
+airDropStageTimes = {40, 25}
 --airDropStageTimes = {35, 2500}
 
 -- ====================== GLOBAL VARIABLES ======================
@@ -228,6 +240,10 @@ currentFogStage = 1
 
 -- used to store ony bottom left and top right corner of each level
 fogGridLimits = {}
+
+-- used to track unique indexes of objects that present cell border
+cellBorderObjects = {}
+previousCellBorderObjects = {}
 
 -- for warnings about time remaining until fog shrinks
 fogShrinkRemainingTime = 0
@@ -312,6 +328,8 @@ function AdvanceFog()
 
 	testBR.UpdateMap()
 
+    testBR.UpdateZoneBorder()
+
 	for _, pid in pairs(playerList) do
 		if Players[pid]:IsLoggedIn() then
 			-- send new map state to player
@@ -391,7 +409,7 @@ testBR.StartMatch = function()
 
     testBR.ResetMapTiles()
 
-	testBR.ResetWorld()
+	--testBR.ResetWorld()
 
     DebugLog(2, "playerList has " .. tostring(#playerList) .. " PIDs in it")
 	for _, pid in pairs(playerList) do
@@ -420,7 +438,8 @@ testBR.EndMatch = function()
         end
 	end
     playerList = {}
-    --testBR.ResetWorld()
+    testBR.RemovePreviousBorder()
+    testBR.ResetWorld()
 
     if automaticMatchmaking then
         testBR.StartMatchProposal()
@@ -429,8 +448,151 @@ end
 
 -- TODO: implement this after implementing chests / drop-on-death
 testBR.ResetWorld = function()
+    testBR.ResetCells()
+end
+
+-- place object in exterior
+-- if list is given, the mpNum will be aded to that list
+testBR.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, scale, list)
+	DebugLog(2, "Placing object " .. tostring(object_id))
+    DebugLog(3, "X: " .. tostring(x) .. "Y: " .. tostring(Y) .. "Z: " .. tostring(Z))
+	local mpNum = WorldInstance:GetCurrentMpNum() + 1
+	local refId = object_id
+    local location = {posX = x, posY = y, posZ = z, rotX = rot_x, rotY = rot_y, rotZ = rot_z}
+	local refIndex =  0 .. "-" .. mpNum
+	local itemref = {refId = object_id, count = 1, charge = -1 }
+	
+	WorldInstance:SetCurrentMpNum(mpNum)
+	tes3mp.SetCurrentMpNum(mpNum)
+
+	if LoadedCells[cell] == nil then
+		logicHandler.LoadCell(cell)
+	end
+	LoadedCells[cell]:InitializeObjectData(refIndex, refId)
+	LoadedCells[cell].data.objectData[refIndex].location = location
+	LoadedCells[cell].data.objectData[refIndex].scale = scale
+	table.insert(LoadedCells[cell].data.packets.place, refIndex)
+
+    -- add object to the list
+    -- this is basically used just to track instances of fog_border
+    if list then
+        entry = {cell, refIndex}
+        table.insert(list, entry)
+    end
+
+    -- TODO: ask David about networking. Do we have to send one package for each object placement
+    -- or can that be grouped together in some way.
+	DebugLog(2, "Sending object info to players")
+	for onlinePid, player in pairs(Players) do
+		if Players[onlinePid]:IsLoggedIn() then
+			tes3mp.InitializeEvent(onlinePid)
+			tes3mp.SetEventCell(cell)
+			tes3mp.SetObjectRefId(refId)
+            if item then
+			    tes3mp.SetObjectCount(item.count)
+			    tes3mp.SetObjectCharge(item.charge)
+            end
+			tes3mp.SetObjectRefNumIndex(0)
+			tes3mp.SetObjectMpNum(mpNum)
+			tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
+			tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
+			tes3mp.SetObjectScale(scale)
+			tes3mp.AddWorldObject()
+			tes3mp.SendObjectPlace()
+			tes3mp.SendObjectScale()
+		end
+	end
+	LoadedCells[cell]:Save()
 
 end
+
+-- place an object that represents a border between the given coordinates
+testBR.PlaceBorderBetweenPoints = function(x, y)
+    -- calculate the middle between the points
+    -- - Khan Academy: https://www.youtube.com/watch?v=Ez_-RwV9WVo
+    -- calculate rotation
+    -- calculate distance between points, use it to determine object scale
+
+end
+
+-- 
+testBR.PlaceBorderBetweenCells = function(cell1_x, cell1_y, cell2_x, cell2_y)
+    -- checke on whichh axis to place border
+    -- border can be either horisontal or vertical.
+    -- Horisontal between two cells where one is "on top" of the other. (different Y coordinates)
+    -- Vertical when cells are next to each other. (Different X coordinates)
+    -- If neither of axis has same value, then cells have no border between them
+    local horisontal_border = nil
+    -- 3.14159 (pi) is 180 degrees, 1.5708 is 90 degrees
+    local rotation = 0
+
+    -- TODO: rewrite this in a decent way, so that it doesn't end up in a CS Diploma meme
+    if cell1_x == cell2_x then
+        horisontal_border = false
+    elseif cell1_y == cell2_y then
+        horisontal_border = true
+        rotation = 1.5708
+    else
+        -- turns out cells don't even share the edge lol
+        tes3mp.LogMessage(2, "Cells have no sides in common, can't place border between them")
+        return
+    end
+
+    DebugLog(3, "Finding host cell for border between " .. tostring(cell1_x) .. ", " .. tostring(cell1_y) .. " and " .. tostring(cell2_x) .. ", " .. tostring(cell2_y))
+    -- figure out which cell should host the border
+    -- technically, each cell has only two options to host: bottom edge or left edge. Top edge and right edge are already in domain of the neighbouring cells
+    -- TES3MP requires correct cell to be used when placing objects. If object coordinates are outside of the cell, it will not spawn
+    -- 0,0 is in the bottom left corner of the cell 0,0, so everything below and including 8191,8191 goes into that cell
+    -- 8192,8192 goes into cell 1,1 | 8192,8191 goes into cell 1,0 | 8191,8192 goes into cell 0,1
+    -- so border between 0,0 and 0,1 would be hosted in 0,1. Between -1,0 and 0,0, the 0,0 would host border. Between -1,-42 and -1,-43 the -1,-42 would host
+    local host_cell = nil
+    -- we are comparing just if greater. not equal, not smaller.
+    -- one of those is always equial, otherwise function would have exited already
+    -- so we are interested just in the other one. If it's smaller, then
+    if cell1_x > cell2_x or cell1_y > cell2_y then
+        host_cell = 1
+    else
+        host_cell = 2
+    end
+    
+    local cells = {{cell1_x, cell1_y}, {cell2_x, cell2_y}}
+    local host_cell_string = tostring(cells[host_cell][1]) .. ", " .. tostring(cells[host_cell][2])
+    local x_coordinate = cells[host_cell][1] * 8192
+    local y_coordinate = cells[host_cell][2] * 8192
+
+    if horisontal_border then
+        y_coordinate = y_coordinate + 4096
+    else
+        x_coordinate = x_coordinate + 4096
+    end
+
+    -- TODO: Figure out way to adjust altitude of the border
+    -- TODO: Handle mesh offset. The fog_border (mesh Ex_GG_fence_s_02.nif) appears to have 24,5 units of offset in Y directoon from it's spawn point
+    -- rotate for 180 degrees on Y axis so the the straight edge replaces the curved edge
+    testBR.PlaceObject("fog_border", host_cell_string, x_coordinate, y_coordinate, 4200, 0, 3.14159, rotation, 2.677, cellBorderObjects)
+
+
+end
+
+-- sets border at cell edge if given true
+testBR.PlaceCellBorders= function(cell_x, cell_y, top, bottom, left, right)
+    if top then
+        testBR.PlaceBorderBetweenCells(cell_x, cell_y, cell_x, cell_y+1)
+    end
+    if bottom then
+        testBR.PlaceBorderBetweenCells(cell_x, cell_y, cell_x, cell_y-1)
+    end
+    if left then
+        testBR.PlaceBorderBetweenCells(cell_x, cell_y, cell_x-1, cell_y)
+    end
+    if right then
+        testBR.PlaceBorderBetweenCells(cell_x, cell_y, cell_x+1, cell_y)
+    end
+end
+
+
+
+
 
 -- starts a new match proposal
 testBR.StartMatchProposal = function()
@@ -669,6 +831,59 @@ testBR.UpdateMapZone = function(zone)
     end
 end
 
+testBR.UpdateZoneBorder = function()
+    
+    --DebugLog(2, "moving " .. tostring(#cellBorderObjects) .. " objects to previousCellBorderObjects")
+    --for i=1,#cellBorderObjects do
+    --    table.insert(previousCellBorderObjects, cellBorderObjects[1])
+    --end
+    --cellBorderObjects = {}
+
+    -- top / north and bottom / south border
+    -- iterate over x, place border above max_y and below min_y
+    -- -1 so that border goes between fogwarn and fog1, instead of in front of fogwarn
+    if currentFogStage > 1 and fogGridLimits[currentFogStage-1] then
+
+        -- this would ideally happen after the new border was placed, but it would require some variable juggling
+        testBR.RemovePreviousBorder()
+
+        for x=fogGridLimits[currentFogStage-1][1][1],fogGridLimits[currentFogStage-1][2][1] do
+            testBR.PlaceCellBorders(x, fogGridLimits[currentFogStage-1][2][2], true, false, false, false)
+            testBR.PlaceCellBorders(x, fogGridLimits[currentFogStage-1][1][2], false, true, false, false)
+        end
+
+        -- left / west and right / east border
+        -- iterate over y, place border on right of max_x and left of min_x
+        for y=fogGridLimits[currentFogStage-1][1][2],fogGridLimits[currentFogStage-1][2][2] do
+            testBR.PlaceCellBorders(fogGridLimits[currentFogStage-1][2][1], y, false, false, false, true)
+            testBR.PlaceCellBorders(fogGridLimits[currentFogStage-1][1][1], y, false, false, true, false)
+        end
+    end
+    
+end
+
+testBR.RemovePreviousBorder = function()
+
+    
+    --DebugLog(2, "currentFogStage:" .. tostring(currentFogStage))
+    --DebugLog(2, "table length:" .. tostring(#previousCellBorderObjects))
+    --DebugLog(2, "to delete: " .. tostring(previousCellBorderObjects[1][2]))
+    --DebugLog(2, "in cell: " .. tostring(previousCellBorderObjects[1][1]))
+    --for i=1,#previousCellBorderObjects do
+    --    DebugLog(2, "deleting: " .. tostring(previousCellBorderObjects[currentFogStage][i][2]) .. " from cell " .. tostring(previousCellBorderObjects[currentFogStage][i][1]) )
+    --    logicHandler.DeleteObjectForEveryone(previousCellBorderObjects[currentFogStage][i][1], previousCellBorderObjects[currentFogStage][i][2])
+    --end
+    -- reset this as well
+    --previousCellBorderObjects = {}
+    if #cellBorderObjects > 0 then
+        for i=1,#cellBorderObjects do
+            --DebugLog(2, "deleting: " .. tostring(previousCellBorderObjects[currentFogStage][i][2]) .. " from cell " .. tostring(previousCellBorderObjects[currentFogStage][i][1]) )
+            logicHandler.DeleteObjectForEveryone(cellBorderObjects[i][1], cellBorderObjects[i][2])
+        end
+    end
+    
+end
+
 -- replace the current zone-marking tiles with the normal (vanilla) ones
 testBR.ResetMapTiles = function()
 	tes3mp.LogMessage(2, "Resetting map tiles")
@@ -790,7 +1005,62 @@ testBR.IsCellInRange = function(cell, topRight, bottomLeft)
 		return true
 	end
 	return false
-end 
+end
+
+-- get coordinates of all corners for given cell
+testBR.getCellCorners = function(cell_x, cell_y)
+    -- lowest x value
+    local min_x = cell_x * 8192
+    -- lowest y value
+    local min_y = cell_y * 8192
+    -- highest x value
+    local max_x = cell_x * 8192 + 8192
+    -- highest y value
+    local max_y = cell_y * 8192 + 8192
+
+    -- bottom left
+    local bl = { min_x, min_y }
+    -- bottom right
+    local br = { min_x, max_y }
+    -- top left
+    local tl = { max_x, min_y}
+    -- top right
+    local tr = { max_x, max_y}
+    local corners = { bl, br, tl, tr}
+    return corners
+end
+
+-- Restore cells to their initial state
+testBR.ResetCells = function()
+    -- TODO: increase this in order to ensure that no changes persist after match has ended
+    for x=-20,40 do
+	    for y=-20,40 do
+            testBR.resetCell(tostring(x) .. tostring(y))
+        end
+    end
+end
+
+-- literally stolen from https://github.com/tes3mp-scripts/CellReset/blob/master/main.lua#L99
+testBR.resetCell = function(cellDescription)
+    local cell = Cell(cellDescription)
+    local cellFilePath = tes3mp.GetModDir() .. "/cell/" .. cell.entryFile
+    
+    if tes3mp.DoesFileExist(cellFilePath) then
+        cell:LoadFromDrive()
+
+        for record_type, links in pairs(cell.data.recordLinks) do
+            local recordStore = RecordStores[record_type]
+            for refId, objects in pairs(links) do
+                recordStore:RemoveLinkToCell(refId, cell)
+            end
+        end
+
+        cell = Cell(cellDescription)
+        cell:SaveToDrive()
+    end
+
+    --CellReset.data.cells[cellDescription] = nil
+end
 
 -- ====================== MATCH DEBUG FUNCTIONS ======================
 
@@ -831,35 +1101,39 @@ end
 
 -- ====================== MISC UTILITY USED ONLY ONCE FUNCTION ======================
 
+-- NOPE: this didn't even work well, it produced bad tiles or missed them completely
+-- actual tiles were then generated by manually moving across all cells in game
+
 -- this makes player move through mosts of the external cells automatically
 -- it's just a lefover, but I left it here for archiving purposes
 -- values for x and y and multipliers are far from optinally configured
 -- meaning that player can go through same set of cells more than once
 -- I ran this in background while doing other productive stuff
-testBR.GenerateMapTiles = function(pid)
-	tes3mp.LogMessage(2, "Spawning player " .. tostring(pid))
-    if debugLevel > 0 and Players[pid]:IsAdmin() then
-        for x=-20,40 do
-            for y=-20,40 do
-                if Players[pid]:IsLoggedIn() then
-		            tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " at " .. tostring(random_x) .. ", " .. tostring(random_y))
-		            spawnPoint = {"1, 1", x*4500, y*6000, 40000, 0}
 
-                    tes3mp.SetCell(pid, spawnPoint[1])
-                    tes3mp.SendCell(pid)
-                    tes3mp.SetPos(pid, spawnPoint[2], spawnPoint[3], spawnPoint[4])
-                    tes3mp.SetRot(pid, 0, spawnPoint[5])
-                    tes3mp.SendPos(pid)
-                    -- so that client has time to load cell, generate image and send it to server
-                    -- works on on operating systems where "sleep" is a valid command
-                    os.execute("sleep 0.5")
-                else
-                    return 0       
-                end
-            end
-        end
-    end
-end
+-- testBR.GenerateMapTiles = function(pid)
+-- 	tes3mp.LogMessage(2, "Spawning player " .. tostring(pid))
+--     if debugLevel > 0 and Players[pid]:IsAdmin() then
+--         for x=-20,40 do
+--             for y=-20,40 do
+--                 if Players[pid]:IsLoggedIn() then
+-- 		            tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " at " .. tostring(random_x) .. ", " .. tostring(random_y))
+-- 		            spawnPoint = {"1, 1", x*4500, y*6000, 40000, 0}
+-- 
+--                     tes3mp.SetCell(pid, spawnPoint[1])
+--                     tes3mp.SendCell(pid)
+--                     tes3mp.SetPos(pid, spawnPoint[2], spawnPoint[3], spawnPoint[4])
+--                     tes3mp.SetRot(pid, 0, spawnPoint[5])
+--                     tes3mp.SendPos(pid)
+--                     -- so that client has time to load cell, generate image and send it to server
+--                     -- works on on operating systems where "sleep" is a valid command
+--                     os.execute("sleep 0.5")
+--                 else
+--                     return 0       
+--                 end
+--             end
+--         end
+--     end
+-- end
 
 -- ====================== PLAYER-RELATED FUNCTIONS ======================
 
@@ -893,31 +1167,47 @@ end
 
 -- Manage items that player has
 testBR.PlayerItems = function(pid)
+
+    -- testBR.seeIfPlayerDeservesAnyNewItems(pid)
+    
 	testBR.LoadPlayerItems(pid)
+
 end
 
 -- save changes and make items appear on player
 testBR.LoadPlayerItems = function(pid)
 	tes3mp.LogMessage(2, "Loading items for " .. tostring(pid))
+    testBR.LoadPlayerOutfit(pid)
 	Players[pid]:Save()
 	Players[pid]:LoadInventory()
 	Players[pid]:LoadEquipment()
+end
+
+-- load player's clothes
+testBR.LoadPlayerOutfit = function(pid)
+    tes3mp.LogMessage(2, "Loading outfit for " .. tostring(pid))
+    -- TODO: consider making a check for the existance of required data
+    -- for now just assume that testBR.VerifyPlayerData did it's thing fine
+    --Players[pid].data.BRinfo.BROutfit
+
+    playerRace = string.lower(Players[pid].data.character.race)
+    -- give shoes
+    if (playerRace ~= "argonian") and (playerRace ~= "khajiit") then
+	    Players[pid].data.equipment[7] = { refId = "common_shoes_01", count = 1, charge = -1 }
+    end
+    -- give shirt
+	Players[pid].data.equipment[8] = { refId = "common_shirt_01", count = 1, charge = -1 }
+    -- give pants
+	Players[pid].data.equipment[9] = { refId = "common_pants_01", count = 1, charge = -1 }
 end
 
 --testBR.PlayerJoin = function(pid)
 --	tes3mp.LogMessage(2, "Setting state for "  .. tostring(pid))
 --	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
 --        table.insert(playerList, pid)
---		Players[pid].data.BRinfo.inMatch = 1
 --	end
 --	tes3mp.SendMessage(pid, color.Yellow .. "Noice. Now you can either propose new match with /newmatch or do /ready when new match is being suggested .\n", false)
 --end
-
-
--- TODO: for player items
-testBR.PlayerItems = function(pid)
-	
-end
 
 -- Used by players to start a new match proposal
 testBR.PlayerStartMatchProposal = function(pid)
@@ -1028,9 +1318,54 @@ testBR.DropAllItems = function(pid)
 	Players[pid]:Save()
 end
 
+-- TODO: restructure in a way that uses testBR.placeObject
+testBR.DropItem = function(pid, index, z_offset)
+	
+	local player = Players[pid]
+	
+	local item = player.data.inventory[index]
+		
+	local mpNum = WorldInstance:GetCurrentMpNum() + 1
+	local cell = tes3mp.GetCell(pid)
+	local location = {
+		posX = tes3mp.GetPosX(pid), posY = tes3mp.GetPosY(pid), posZ = tes3mp.GetPosZ(pid) + z_offset,
+		rotX = tes3mp.GetRotX(pid), rotY = 0, rotZ = tes3mp.GetRotZ(pid)
+	}
+	local itemref = {refId = item.refId, count = item.count, charge = item.charge }
+	local refId = item.refId
+	local refIndex =  0 .. "-" .. mpNum
+	Players[pid]:Save()
+	DebugLog(2, "Removing item " .. tostring(item.refId))
+	Players[pid]:LoadItemChanges({itemref}, enumerations.inventory.REMOVE)	
+	
+	WorldInstance:SetCurrentMpNum(mpNum)
+	tes3mp.SetCurrentMpNum(mpNum)
+
+	LoadedCells[cell]:InitializeObjectData(refIndex, refId)
+	LoadedCells[cell].data.objectData[refIndex].location = location			
+	table.insert(LoadedCells[cell].data.packets.place, refIndex)
+	DebugLog(2, "Sending data to other players")
+	for onlinePid, player in pairs(Players) do
+		if Players[onlinePid]:IsLoggedIn() then
+			tes3mp.InitializeEvent(onlinePid)
+			tes3mp.SetEventCell(cell)
+			tes3mp.SetObjectRefId(refId)
+			tes3mp.SetObjectCount(item.count)
+			tes3mp.SetObjectCharge(item.charge)
+			tes3mp.SetObjectRefNumIndex(0)
+			tes3mp.SetObjectMpNum(mpNum)
+			tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
+			tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
+			tes3mp.AddWorldObject()
+			tes3mp.SendObjectPlace()
+		end
+	end
+	LoadedCells[cell]:Save()
+end
+
 -- inspired by code from from David-AW (https://github.com/David-AW/tes3mp-safezone-dropitems/blob/master/deathdrop.lua#L134)
 -- and from rickoff (https://github.com/rickoff/Tes3mp-Ecarlate-Script/blob/0.7.0/DeathDrop/DeathDrop.lua
-testBR.DropItem = function(pid, index, z_offset)
+testBR.DropItem_old = function(pid, index, z_offset)
 		
 	local player = Players[pid]
 	
@@ -1052,7 +1387,7 @@ testBR.DropItem = function(pid, index, z_offset)
 	WorldInstance:SetCurrentMpNum(mpNum)
 	tes3mp.SetCurrentMpNum(mpNum)
 
-	LoadedCells[cell]:InitializeObjectData(refIndex, refId)		
+	LoadedCells[cell]:InitializeObjectData(refIndex, refId)
 	LoadedCells[cell].data.objectData[refIndex].location = location			
 	table.insert(LoadedCells[cell].data.packets.place, refIndex)
 	DebugLog(2, "Sending data to other players")
@@ -1102,7 +1437,7 @@ testBR.SendMapToPlayer = function(pid)
 	tes3mp.SendWorldMap(pid)
 end
 
--- TODO: why is this here? Did Was it for removing containers and NPCS/creatures?
+-- TODO: why is this here? Was it for removing containers and NPCS/creatures?
 testBR.OnCellLoad = function(pid)
 
 end
@@ -1116,7 +1451,7 @@ testBR.ProcessDeath = function(pid)
 	end
 	testBR.SpawnPlayer(pid, true)
 	testBR.SetFogDamageLevel(pid, 0)
-	--Players[pid].data.BRinfo.inMatch = 0
+    testBR.PlayerItems(pid)
 	Players[pid]:Save()
 end
 
@@ -1127,10 +1462,8 @@ testBR.VerifyPlayerData = function(pid)
 	if Players[pid].data.BRinfo == nil then
 		BRinfo = {}
 		BRinfo.matchId = ""
-		BRinfo.inMatch = 0 -- 1 = alive, 0 = ded, press F to pay respects
 		BRinfo.chosenSpawnPoint = nil
 		BRinfo.team = 0
-		BRinfo.airMode = 0
 		BRinfo.totalKills = 0
 		BRinfo.totalDeaths = 0		
 		BRinfo.wins = 0
@@ -1147,7 +1480,6 @@ testBR.ResetCharacter = function(pid)
 
 	-- Reset battle royale
 	Players[pid].data.BRinfo.team = 0
-	--Players[pid].data.BRinfo.inMatch = 1
 	
 	-- Reset player level
 	Players[pid].data.stats.level = defaultStats.playerLevel
@@ -1230,21 +1562,6 @@ testBR.validateCell = function(pid)
     
     return true
 end
-
-
--- This is basically hijacking OnPlayerTopic event signal for our own purposes
--- OnPlayerTopic because it doesn't play any role in purely PvP gamemode where no NPCs are present
--- TODO: figure out how to add new event without messing up with server core, so that all the code is only in this file
-customEventHooks.registerValidator("OnPlayerTopic", function(eventStatus, pid)
-	return customEventHooks.makeEventStatus(false,true)
-end)
-
--- TODO: remove because deprecated
-customEventHooks.registerHandler("OnPlayerTopic", function(eventStatus, pid)
-	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
-		testBR.HandleAirMode(pid)
-	end
-end)
 
 customEventHooks.registerHandler("OnPlayerFinishLogin", function(eventStatus, pid)
 	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
