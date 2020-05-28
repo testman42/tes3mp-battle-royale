@@ -2,7 +2,6 @@
 -- Battle Royale game mode by testman
 -- v0.6
 
-
 -- MAXIMUM TODO:
 -- as soon as this project is functional and published, figure out how to elegantly split this huge file into smaller files
 
@@ -20,6 +19,7 @@
 -- - implement said decent zone-shrinking logic
 -- - make shrinking take some time instead of being an instant event
 -- - make zone circle-shaped (or at least blocky pixelated circle shaped)
+-- make fog_limits be already in place, just enable / disable them instead of placing them
 -- make players unable to open vanilla containers
 -- implement custom containers that can be opened by players
 -- clear inventory
@@ -38,6 +38,7 @@
 -- decide on what should always be part of a log and what should be just debug message
 -- - properly define debug levels
 -- - warning messages about game mechanics (eg. "In this match you can not enter interiors"
+-- - tell fog stage to players (include "x out of y" in fog shrink message")
 --[[
 
 =================== DESIGN DOCUMENT PART ===================
@@ -103,6 +104,9 @@ fogZone - one set of cells. It is used to easily determine if cell that player e
 
 fogStage - basically index of fog progress
 
+example of shrink durations: https://pubg.gamepedia.com/The_Playzone#Maps (think about using this for ratio between shrink times)
+https://www.reddit.com/r/FortNiteBR/comments/78y6mp/total_time_for_storm_to_close/doxn1jh/
+
 
 ]]
 
@@ -119,7 +123,7 @@ debugLevel = 0
 -- you will most likely want this to be very low in order to have skybox remain the same
 --timeScale = 0.1
 
--- determines default time of day for maps that do not have it specified
+-- determines default time of day, can be used to regulate brightness
 --timeOfDay = 9
 
 -- determines default weather
@@ -149,7 +153,8 @@ defaultStats = {
 playerLevel = 1,
 playerAttributes = 80,
 playerSkills = 80,
-playerHealth = 100,
+playerHealth = 200,
+--playerHealth = 10000,
 playerMagicka = 100,
 playerFatigue = 300,
 playerLuck = 100,
@@ -163,10 +168,10 @@ playerMarksman = 150
 fogZoneSizes = {"all", 20, 15, 10, 5, 3, 1}
 
 -- Actual attempt
-fogStageDurations = {500, 400, 240, 120, 90, 60, 30, 0}
+--fogStageDurations = {500, 400, 240, 120, 90, 60, 30, 0}
 -- Debug durations, first one for automatic quick iteration, second one for manual control
 --fogStageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
---fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
+fogStageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
 -- determines the order of how levels increase damage
 -- TODO: Would it make more sense to abandon this and instead map values to integers
@@ -179,12 +184,6 @@ fogDamageValues = {"warn", 1, 2, 3}
 -- used to determine the cell span on which to use the fog logic
 -- {{min_X, min_Y},{max_X, max_Y}}
 mapBorders = {{-15,-15}, {25,25}}
-
--- list of weapons used to generate random loot
-weaponList = {}
-
--- list of armor used to generate random loot
-armorList = {}
 
 -- determines how the process for starting the match goes
 -- if true, then server periodically proposes new match and starts it if criteria is met (just /ready)
@@ -216,6 +215,65 @@ fogName = "Blight storm"
 airDropStageTimes = {40, 25}
 --airDropStageTimes = {35, 2500}
 
+-- list of weapons used to generate random loot
+-- TODO: this is more complex than just one list, loot tables will require more lists
+--weaponList = {}
+
+-- list of armor used to generate random loot
+--armorList = {}
+
+-- loot tables
+-- "loot tables" in vanilla game: https://en.uesp.net/wiki/Morrowind:Leveled_Lists
+lootTables = {
+armor = {},
+weapons = {},
+potions = {},
+scrolls = {},
+ingredients = {}
+}
+
+lootTables.armor[1] = {"netch_leather_boiled_cuirass","netch_leather_cuirass", "chitin cuirass", "nordic_ringmail_cuirass", "bonemold_cuirass"}
+lootTables.armor[2] = {"netch_leather_boiled_cuirass","netch_leather_cuirass", "chitin cuirass", "nordic_ringmail_cuirass", "bonemold_cuirass"}
+lootTables.armor[3] = {"netch_leather_boiled_cuirass","netch_leather_cuirass", "chitin cuirass", "nordic_ringmail_cuirass", "bonemold_cuirass"}
+lootTables.armor[4] = {"netch_leather_boiled_cuirass","netch_leather_cuirass", "chitin cuirass", "nordic_ringmail_cuirass", "bonemold_cuirass"}
+lootTables.weapons[1] = {"iron dagger", "iron flameblade", "silver staff", "silver vipersword", "steel katana", "silver sparkaxe"}
+lootTables.weapons[2] = {"iron dagger", "iron flameblade", "silver staff", "silver vipersword", "steel katana", "silver sparkaxe"}
+lootTables.weapons[3] = {"iron dagger", "iron flameblade", "silver staff", "silver vipersword", "steel katana", "silver sparkaxe"}
+lootTables.weapons[4] = {"iron dagger", "iron flameblade", "silver staff", "silver vipersword", "steel katana", "silver sparkaxe"}
+lootTables.potions[1] = {"p_restore_health_b", "p_feather_c", "p_frost_shield_c"}
+lootTables.potions[2] = {"p_restore_health_b", "p_feather_c", "p_frost_shield_c"}
+lootTables.potions[3] = {"p_restore_health_b", "p_feather_c", "p_frost_shield_c"}
+lootTables.potions[4] = {"p_restore_health_b", "p_feather_c", "p_frost_shield_c"}
+lootTables.scrolls[1] = {"sc_frostguard", "sc_firstbarrier"}
+lootTables.scrolls[2] = {"sc_frostguard", "sc_firstbarrier"}
+lootTables.scrolls[3] = {"sc_frostguard", "sc_firstbarrier"}
+lootTables.scrolls[4] = {"sc_frostguard", "sc_firstbarrier"}
+lootTables.ingredients[1] = {"ingred_bread_01", "ingred_bonemeal_01", "ingred_fire_salts_01"}
+lootTables.ingredients[2] = {"ingred_bread_01", "ingred_bonemeal_01", "ingred_fire_salts_01"}
+lootTables.ingredients[3] = {"ingred_bread_01", "ingred_bonemeal_01", "ingred_fire_salts_01"}
+lootTables.ingredients[4] = {"ingred_bread_01", "ingred_bonemeal_01", "ingred_fire_salts_01"}
+
+
+-- x, z, y so spawning function has to be adjusted
+lootSpawnLocations ={
+{"0, -7", 1897.5004882812, 1473.7244873047, -57060.12109375},
+{"0, -7", 5335.876953125, 1672.0218505859, -56260.42578125},
+{"-11, 11", -85677.1953125, 997.19689941406, 91837.0546875},
+{"18, 3", 149032.09375, 648.02185058594, 29671.837890625},
+{"18, 4", 147871.765625, 680.02185058594, 38927.62109375},
+{"-2, -9", -11254.506835938, 218.03240966797, -70889.328125},
+{"3, -10", 29876.8046875, 768.02185058594, -76459.2265625},
+{"-3, -2", -23688.044921875, 504.02185058594, -16165.71875},
+{"-3, -2", -17149.45703125, 168.02185058594, -15837.62890625},
+{"-3, -2", -17338.44921875, 160.02185058594, -11923.168945312},
+{"4, -11", 33648.3046875, 576.02191162109, -89430.1171875},
+{"4, -13", 32827.9296875, 1054.3166503906, -98990.921875},
+{"-4, -2", -24935.73046875, 960.02185058594, -12761.151367188},
+{"6, -7", 53834.80078125, 160.48626708984, -51331.71484375},
+{"7, 22", 61849.34765625, 255.99046325684, 182278.78125}
+}
+
+
 -- ====================== GLOBAL VARIABLES ======================
 
 -- unique identifier for the match
@@ -242,8 +300,12 @@ currentFogStage = 1
 fogGridLimits = {}
 
 -- used to track unique indexes of objects that present cell border
-cellBorderObjects = {}
-previousCellBorderObjects = {}
+trackedObjects = {
+cellBorderObjects = {},
+spawnedItems = {},
+droppedItems = {},
+placedItems = {}
+}
 
 -- for warnings about time remaining until fog shrinks
 fogShrinkRemainingTime = 0
@@ -409,7 +471,7 @@ testBR.StartMatch = function()
 
     testBR.ResetMapTiles()
 
-	--testBR.ResetWorld()
+    testBR.SpawnLoot()
 
     DebugLog(2, "playerList has " .. tostring(#playerList) .. " PIDs in it")
 	for _, pid in pairs(playerList) do
@@ -438,7 +500,6 @@ testBR.EndMatch = function()
         end
 	end
     playerList = {}
-    testBR.RemovePreviousBorder()
     testBR.ResetWorld()
 
     if automaticMatchmaking then
@@ -448,19 +509,37 @@ end
 
 -- TODO: implement this after implementing chests / drop-on-death
 testBR.ResetWorld = function()
-    testBR.ResetCells()
+
+    -- removes the last border
+    --testBR.RemovePreviousBorder()
+
+    --cleans up items
+    --testBR.RemoveAllItems()
+    --testBR.ResetCells()
+    --testBR.ResetTimeOfDay()
+    --testBR.ResetWeather()
+
+    -- TODO: would this be more elegant with functions or is it fine to just brute-force through the list?
+    for _, list in pairs(trackedObjects) do
+        for index, entry in pairs(list) do
+            testBR.DeleteObject(entry[1], entry[2])
+        end
+    end
+    
 end
 
 -- place object in exterior
 -- if list is given, the mpNum will be aded to that list
-testBR.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, scale, list)
+testBR.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, scale, list, object_count, object_charge)
 	DebugLog(2, "Placing object " .. tostring(object_id))
-    DebugLog(3, "X: " .. tostring(x) .. "Y: " .. tostring(Y) .. "Z: " .. tostring(Z))
+    DebugLog(3, "x: " .. tostring(x) .. ", y: " .. tostring(y) .. ", z: " .. tostring(z))
 	local mpNum = WorldInstance:GetCurrentMpNum() + 1
 	local refId = object_id
     local location = {posX = x, posY = y, posZ = z, rotX = rot_x, rotY = rot_y, rotZ = rot_z}
 	local refIndex =  0 .. "-" .. mpNum
-	local itemref = {refId = object_id, count = 1, charge = -1 }
+    if object_count and object_charge then
+	    local itemref = {refId = object_id, count = object_count, charge = object_charge }
+    end
 	
 	WorldInstance:SetCurrentMpNum(mpNum)
 	tes3mp.SetCurrentMpNum(mpNum)
@@ -488,9 +567,12 @@ testBR.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, sca
 			tes3mp.InitializeEvent(onlinePid)
 			tes3mp.SetEventCell(cell)
 			tes3mp.SetObjectRefId(refId)
-            if item then
-			    tes3mp.SetObjectCount(item.count)
-			    tes3mp.SetObjectCharge(item.charge)
+            if object_count and object_charge then
+			    tes3mp.SetObjectCount(object_count)
+			    tes3mp.SetObjectCharge(object_count)
+            else
+                tes3mp.SetObjectCount(1)
+			    tes3mp.SetObjectCharge(-1)
             end
 			tes3mp.SetObjectRefNumIndex(0)
 			tes3mp.SetObjectMpNum(mpNum)
@@ -503,7 +585,13 @@ testBR.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, sca
 		end
 	end
 	LoadedCells[cell]:Save()
+end
 
+testBR.DeleteObject = function(cellName, objectUniqueIndex)
+    if cellName and LoadedCells[cellName] then
+        LoadedCells[cellName]:DeleteObjectData(objectUniqueIndex)
+        logicHandler.DeleteObjectForEveryone(cellName, objectUniqueIndex)
+    end
 end
 
 -- place an object that represents a border between the given coordinates
@@ -569,13 +657,12 @@ testBR.PlaceBorderBetweenCells = function(cell1_x, cell1_y, cell2_x, cell2_y)
     -- TODO: Figure out way to adjust altitude of the border
     -- TODO: Handle mesh offset. The fog_border (mesh Ex_GG_fence_s_02.nif) appears to have 24,5 units of offset in Y directoon from it's spawn point
     -- rotate for 180 degrees on Y axis so the the straight edge replaces the curved edge
-    testBR.PlaceObject("fog_border", host_cell_string, x_coordinate, y_coordinate, 4200, 0, 3.14159, rotation, 2.677, cellBorderObjects)
-
+    testBR.PlaceObject("fog_border", host_cell_string, x_coordinate, y_coordinate, 4200, 0, 3.14159, rotation, 2.677, trackedObjects["cellBorderObjects"])
 
 end
 
 -- sets border at cell edge if given true
-testBR.PlaceCellBorders= function(cell_x, cell_y, top, bottom, left, right)
+testBR.PlaceCellBorders = function(cell_x, cell_y, top, bottom, left, right)
     if top then
         testBR.PlaceBorderBetweenCells(cell_x, cell_y, cell_x, cell_y+1)
     end
@@ -590,8 +677,54 @@ testBR.PlaceCellBorders= function(cell_x, cell_y, top, bottom, left, right)
     end
 end
 
+testBR.SpawnLoot = function()
+    
+    for _, entry in pairs(lootSpawnLocations) do
+        -- adjusted for X, Z, Y
+        testBR.SpawnLootAroundPosition(entry[1], entry[2], entry[4], entry[3], 0)
+    end
+end
 
+testBR.SpawnLootAroundPosition = function(cell, x, y, z, rot_z)
 
+    local amount_of_loot = math.random(4,8)
+    local spacing = 50
+    local x_offset = 0
+    local y_offset = 0
+    for i=1,amount_of_loot do
+        local object_id = testBR.GetRandomLoot()
+        testBR.SpawnItem(object_id, cell, x+x_offset*spacing, y+y_offset*spacing, z+10, 0, 0, rot_z, 1)
+        x_offset = x_offset + 1
+        if x_offset > 3 then
+            x_offset = 0
+            y_offset = y_offset + 1
+        end
+    end
+end
+
+-- TODO: fix this abomination, make it account for empty tables
+testBR.GetRandomLoot = function(loot_type, loot_tier)
+    if not loot_type then
+        -- lol I'm sorry, I thought this was a decent programming language
+        -- I miss Python
+        --loot_type = math.random(#lootTables)
+        loot_types = {"armor", "weapons", "potions", "scrolls", "ingredients"}
+        loot_type = loot_types[math.random(1,5)]
+    end
+
+    if not loot_tier then
+        DebugLog(3, "loot_type: " .. tostring(loot_type))
+        loot_tier = math.random(1,#lootTables[loot_type])
+    end
+    
+    return lootTables[loot_type][loot_tier][math.random(#lootTables[loot_type][loot_tier])]
+end
+
+testBR.SpawnItem = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, scale)
+
+    testBR.PlaceObject(object_id, cell, x, y, z, rot_x, rot_y, rot_z, scale, trackedObjects["spawnedItems"])
+
+end
 
 
 -- starts a new match proposal
@@ -875,10 +1008,11 @@ testBR.RemovePreviousBorder = function()
     --end
     -- reset this as well
     --previousCellBorderObjects = {}
-    if #cellBorderObjects > 0 then
-        for i=1,#cellBorderObjects do
+    if #trackedObjects["cellBorderObjects"] > 0 then
+        for i=1,#trackedObjects["cellBorderObjects"] do
             --DebugLog(2, "deleting: " .. tostring(previousCellBorderObjects[currentFogStage][i][2]) .. " from cell " .. tostring(previousCellBorderObjects[currentFogStage][i][1]) )
-            logicHandler.DeleteObjectForEveryone(cellBorderObjects[i][1], cellBorderObjects[i][2])
+            --logicHandler.DeleteObjectForEveryone(cellBorderObjects[i][1], cellBorderObjects[i][2])
+            testBR.DeleteObject(trackedObjects["cellBorderObjects"][i][1], trackedObjects["cellBorderObjects"][i][2])
         end
     end
     
@@ -1041,6 +1175,7 @@ testBR.ResetCells = function()
 end
 
 -- literally stolen from https://github.com/tes3mp-scripts/CellReset/blob/master/main.lua#L99
+-- TODO: does not seem to be working, remove
 testBR.resetCell = function(cellDescription)
     local cell = Cell(cellDescription)
     local cellFilePath = tes3mp.GetModDir() .. "/cell/" .. cell.entryFile
@@ -1284,6 +1419,8 @@ testBR.SpawnPlayer = function(pid, spawnInLobby)
 	tes3mp.LogMessage(2, "Spawning player " .. tostring(pid))
 	if spawnInLobby then
 		chosenSpawnPoint = {lobbyCell, lobbyCoordinates[1], lobbyCoordinates[2], lobbyCoordinates[3], 0}
+        testBR.ResetCharacter(pid)
+        testBR.LoadPlayerItems(pid)
 	else
 		-- TEST: use random spawn point for now
 		random_x = math.random(-40000,80000)
@@ -1318,49 +1455,25 @@ testBR.DropAllItems = function(pid)
 	Players[pid]:Save()
 end
 
--- TODO: restructure in a way that uses testBR.placeObject
 testBR.DropItem = function(pid, index, z_offset)
 	
 	local player = Players[pid]
 	
 	local item = player.data.inventory[index]
-		
-	local mpNum = WorldInstance:GetCurrentMpNum() + 1
-	local cell = tes3mp.GetCell(pid)
-	local location = {
-		posX = tes3mp.GetPosX(pid), posY = tes3mp.GetPosY(pid), posZ = tes3mp.GetPosZ(pid) + z_offset,
-		rotX = tes3mp.GetRotX(pid), rotY = 0, rotZ = tes3mp.GetRotZ(pid)
-	}
-	local itemref = {refId = item.refId, count = item.count, charge = item.charge }
-	local refId = item.refId
-	local refIndex =  0 .. "-" .. mpNum
-	Players[pid]:Save()
-	DebugLog(2, "Removing item " .. tostring(item.refId))
-	Players[pid]:LoadItemChanges({itemref}, enumerations.inventory.REMOVE)	
 	
-	WorldInstance:SetCurrentMpNum(mpNum)
-	tes3mp.SetCurrentMpNum(mpNum)
+    if item then
 
-	LoadedCells[cell]:InitializeObjectData(refIndex, refId)
-	LoadedCells[cell].data.objectData[refIndex].location = location			
-	table.insert(LoadedCells[cell].data.packets.place, refIndex)
-	DebugLog(2, "Sending data to other players")
-	for onlinePid, player in pairs(Players) do
-		if Players[onlinePid]:IsLoggedIn() then
-			tes3mp.InitializeEvent(onlinePid)
-			tes3mp.SetEventCell(cell)
-			tes3mp.SetObjectRefId(refId)
-			tes3mp.SetObjectCount(item.count)
-			tes3mp.SetObjectCharge(item.charge)
-			tes3mp.SetObjectRefNumIndex(0)
-			tes3mp.SetObjectMpNum(mpNum)
-			tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
-			tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
-			tes3mp.AddWorldObject()
-			tes3mp.SendObjectPlace()
-		end
-	end
-	LoadedCells[cell]:Save()
+        local cell = tes3mp.GetCell(pid)
+
+        local location = {
+		    posX = tes3mp.GetPosX(pid), posY = tes3mp.GetPosY(pid), posZ = tes3mp.GetPosZ(pid) + z_offset,
+		    rotX = tes3mp.GetRotX(pid), rotY = 0, rotZ = tes3mp.GetRotZ(pid)
+	    }
+        local itemref = {refId = item.refId, count = item.count, charge = item.charge }
+
+        testBR.PlaceObject(item.refId, cell, location.posX, location.posY, location.posZ, location.rotY, location.rotY, location.rotZ, 1, trackedObjects["droppedItems"])
+    end
+    
 end
 
 -- inspired by code from from David-AW (https://github.com/David-AW/tes3mp-safezone-dropitems/blob/master/deathdrop.lua#L134)
@@ -1474,8 +1587,13 @@ testBR.VerifyPlayerData = function(pid)
 	end
 end
 
--- Called from local PlayerInit to reset characters for each new match
 testBR.ResetCharacter = function(pid)
+    testBR.ResetCharacterStats(pid)
+    testBR.ResetCharacterItems(pid)
+end
+
+-- Called from local PlayerInit to reset characters for each new match
+testBR.ResetCharacterStats = function(pid)
 	tes3mp.LogMessage(2, "Resetting stats for " .. Players[pid].data.login.name .. ".")
 
 	-- Reset battle royale
@@ -1526,6 +1644,16 @@ testBR.ResetCharacter = function(pid)
 	--tes3mp.LogMessage(2, "Dynamic stats loaded")
 end
 
+testBR.ResetCharacterItems = function(pid)
+    if Players[pid]:IsLoggedIn() then
+        Players[pid].data.inventory = {}
+        Players[pid].data.equipment = {}
+	    Players[pid]:Save()
+	    Players[pid]:LoadInventory()
+	    Players[pid]:LoadEquipment()
+    end
+end
+
 -- Handle generation of new character
 testBR.EndCharGen = function(pid)
 	tes3mp.LogMessage(2, "Ending character generation for " .. tostring(pid))
@@ -1565,6 +1693,8 @@ end
 
 customEventHooks.registerHandler("OnPlayerFinishLogin", function(eventStatus, pid)
 	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
+        local confirmations = {"Cool", "Noice", "Awesome", "Yup", "Got it", "Makes sense", "Sounds good", "Will keep that in mind", "Bottom text", "Just let me in", "Dagoth Ur did nothing wrong"}
+        tes3mp.CustomMessageBox(pid, 1, "WARNING:\nThis is an unfinished prototype for battle royale.\n\nIt is not even remotely balanced yet.\nAnd it can crash at any moment.\nIf it does, the server will automatically restart.\n\nStill, feel free to provide feedback by opening an issue in the tes3mp-battle-royale GitLab (or GitHub) repository", confirmations[math.random(1,11)])
 		testBR.VerifyPlayerData(pid)
         -- check if player count is high enough to start automatic process
         if automaticMatchmaking then
