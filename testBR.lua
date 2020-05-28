@@ -107,6 +107,8 @@ fogStage - basically index of fog progress
 example of shrink durations: https://pubg.gamepedia.com/The_Playzone#Maps (think about using this for ratio between shrink times)
 https://www.reddit.com/r/FortNiteBR/comments/78y6mp/total_time_for_storm_to_close/doxn1jh/
 
+On Linux use loop "while :; do ./tes3mp-server || rm -f CoreScripts/data/cell/* && cp CoreScripts/data/clean_ToddTest.json CoreScripts/data/cell/ToddTest.json; done" to run server
+Best if done in tmux
 
 ]]
 
@@ -735,7 +737,7 @@ testBR.StartMatchProposal = function()
     -- So instead of trying to figure out why this is so, we will just shift things for 1, replacing 1 with 0
     if #Players > 0 and not matchInProgress and not matchProposalInProgress then
         tes3mp.LogMessage(2, "Proposing a start of a new match")
-        tes3mp.SendMessage(0, "New match is being proposed. Type /ready in the next " .. tostring(matchProposalTime) .. " seconds in order to join.\n", true)
+        tes3mp.SendMessage(0, "New match is being proposed. Type " .. color.Yellow .. "/ready" .. color.White .. " in the next " .. tostring(matchProposalTime) .. " seconds in order to join.\n", true)
 	    matchProposalInProgress = true
         readyList = {}
 	    matchProposalTimer = tes3mp.CreateTimerEx("EndMatchProposal", time.seconds(matchProposalTime), "i", 1)
@@ -1347,7 +1349,7 @@ end
 -- Used by players to start a new match proposal
 testBR.PlayerStartMatchProposal = function(pid)
     if pid ~= nil then
-        tes3mp.SendMessage(pid, "New match will start if all participants are ready. Type /ready to confirm.\n", true)
+        tes3mp.SendMessage(pid, "New match will start if all participants are ready. Type " .. color.Yellow .. " /ready" .. color.White .. " to confirm.\n", true)
         testBR.StartMatchProposal()
         -- if match proposal started then mark the player who started the proposal as first participant
         if matchProposalInProgress then
@@ -1693,8 +1695,9 @@ end
 
 customEventHooks.registerHandler("OnPlayerFinishLogin", function(eventStatus, pid)
 	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
+        testBR.SpawnPlayer(pid, true)
         local confirmations = {"Cool", "Noice", "Awesome", "Yup", "Got it", "Makes sense", "Sounds good", "Will keep that in mind", "Bottom text", "Just let me in", "Dagoth Ur did nothing wrong"}
-        tes3mp.CustomMessageBox(pid, 1, "WARNING:\nThis is an unfinished prototype for battle royale.\n\nIt is not even remotely balanced yet.\nAnd it can crash at any moment.\nIf it does, the server will automatically restart.\n\nStill, feel free to provide feedback by opening an issue in the tes3mp-battle-royale GitLab (or GitHub) repository", confirmations[math.random(1,11)])
+        tes3mp.CustomMessageBox(pid, 1, "WARNING:\nThis is an unfinished prototype for battle royale.\n\nIt is not even remotely balanced yet.\nAnd it can crash at any moment.\nIf it does, the server will automatically restart.\n\nStill, feel free to provide feedback by opening an issue in the tes3mp-battle-royale GitLab (or GitHub) repository.\n\nType" .. , confirmations[math.random(1,11)])
 		testBR.VerifyPlayerData(pid)
         -- check if player count is high enough to start automatic process
         if automaticMatchmaking then
