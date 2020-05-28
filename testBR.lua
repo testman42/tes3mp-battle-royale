@@ -1697,7 +1697,7 @@ customEventHooks.registerHandler("OnPlayerFinishLogin", function(eventStatus, pi
 	if eventStatus.validCustomHandlers then --check if some other script made this event obsolete
         testBR.SpawnPlayer(pid, true)
         local confirmations = {"Cool", "Noice", "Awesome", "Yup", "Got it", "Makes sense", "Sounds good", "Will keep that in mind", "Bottom text", "Just let me in", "Dagoth Ur did nothing wrong"}
-        tes3mp.CustomMessageBox(pid, 1, "WARNING:\nThis is an unfinished prototype for battle royale.\n\nIt is not even remotely balanced yet.\nAnd it can crash at any moment.\nIf it does, the server will automatically restart.\n\nStill, feel free to provide feedback by opening an issue in the tes3mp-battle-royale GitLab (or GitHub) repository.\n\nType" .. , confirmations[math.random(1,11)])
+        tes3mp.CustomMessageBox(pid, 1, "WARNING:\nThis is an unfinished prototype for battle royale.\n\nIt is not even remotely balanced yet.\nAnd it can crash at any moment.\nIf it does, the server will automatically restart.\n\nStill, feel free to provide feedback by opening an issue in the tes3mp-battle-royale GitLab (or GitHub) repository.\n\n", confirmations[math.random(1,11)])
 		testBR.VerifyPlayerData(pid)
         -- check if player count is high enough to start automatic process
         if automaticMatchmaking then
