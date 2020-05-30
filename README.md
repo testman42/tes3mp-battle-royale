@@ -13,3 +13,9 @@ And some changes have to be made in config.lua, for example chhanging the defaul
 Feel free to look at the [roadmap](https://github.com/testman42/tes3mp-battle-royale/projects/1) for the project.
 
 Any kind of [feedback or criticism](https://github.com/testman42/tes3mp-battle-royale/issues/new/choose) is welcome.
+
+Here you can see how this plays:
+
+https://www.youtube.com/watch?v=_vWnmucF_yE
+
+https://www.youtube.com/watch?v=BxJqDsHrnJM
