@@ -1,0 +1,27 @@
+[submodule "dependencies/DataManager"]
+	path = dependencies/DataManager
+	url = https://github.com/tes3mp-scripts/DataManager
+[submodule "dependencies/ShutdownServer"]
+	path = dependencies/ShutdownServer
+	url = https://github.com/tes3mp-scripts/ShutdownServer
+[submodule "dependencies/FullLoot"]
+	path = dependencies/FullLoot
+	url = https://github.com/tes3mp-scripts/FullLoot
+[submodule "dependencies/PlayerLobby"]
+	path = dependencies/PlayerLobby
+	url = https://github.com/tes3mp-scripts/PlayerLobby
+[submodule "dependencies/VisualHarvesting"]
+	path = dependencies/VisualHarvesting
+	url = https://github.com/tes3mp-scripts/VisualHarvesting
+[submodule "dependencies/FootPrints"]
+	path = dependencies/FootPrints
+	url = https://github.com/tes3mp-scripts/FootPrints
+[submodule "dependencies/DropFramework"]
+	path = dependencies/DropFramework
+	url = https://github.com/tes3mp-scripts/DropFramework
+[submodule "dependencies/CustomAlchemy"]
+	path = dependencies/CustomAlchemy
+	url = https://github.com/tes3mp-scripts/CustomAlchemy
+[submodule "dependencies/SupportTickets"]
+	path = dependencies/SupportTickets
+	url = https://github.com/tes3mp-scripts/SupportTickets
