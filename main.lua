@@ -17,6 +17,8 @@ math.randomseed(os.time())
 -- load order of these is important
 DataManager = require("custom/tes3mp-battle-royale/dependencies/DataManager/main")
 PlayerLobby = require("custom/tes3mp-battle-royale/dependencies/PlayerLobby/main")
+ContainerFramework = require("custom/tes3mp-battle-royale/dependencies/ContainerFramework/main")
+--FullLoot = require("custom/tes3mp-battle-royale/dependencies/FullLoot/main")
 brConfig = require("custom/tes3mp-battle-royale/BRConfig")
 brDebug = require("custom/tes3mp-battle-royale/BRDebug")
 matchLogic = require("custom/tes3mp-battle-royale/game_logic/matchLogic")
@@ -53,6 +55,7 @@ testBR.OnServerPostInit = function()
     end
     
 end
+
 
 return testBR
 

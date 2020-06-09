@@ -310,7 +310,11 @@ mapLogic.SpawnLoot = function()
     end
 end
 
-mapLogic.SpawnLootAroundPosition = function(cell, x, y, z, rot_z)
+mapLogic.SpawnLootContainerAtPosition = function(cell, x, y, z, rot_z, lootType, lootTier)
+    
+end
+
+mapLogic.SpawnLootAroundPosition = function(cell, x, y, z, rot_z, lootType, lootTier)
     local amount_of_loot = math.random(4,8)
     local spacing = 50
     local x_offset = 0
@@ -364,11 +368,9 @@ mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, list, item_count,
             tes3mp.SetObjectCharge(item_charge)
             tes3mp.SetObjectEnchantmentCharge(item_charge)
 			tes3mp.SetObjectRefNumIndex(0)
-            brDebug.Log(1, "1")
 			tes3mp.SetObjectMpNum(mpNum)
 			tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
 			tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
-            brDebug.Log(1, "2")
 			tes3mp.AddWorldObject()
 			tes3mp.SendObjectPlace()
 		end
@@ -441,87 +443,5 @@ mapLogic.IsCellExternal = function(cell)
     end
     return true
 end
-
---[[
-
-BACKUP
-
--- used to store only bottom left and top right corner of each level
--- but we don't use it any mode because we are doing circles now
---fogGridLimits = {}
-
-
-generategrid:
-    -- set up start point
-    -- since we are dealing with circles, the reference point is the centre of the circle
-    -- and not just that, circle logic is geometry-based, not cell based
-    -- so we translate cell position to coordinates ( *8192 ) and add a length of half cell, so that we get the centre of starting cell
-    zoneAnchors[1] = {}
-    table.insert(zoneAnchors[1], brConfig.mapCentre[1]*8192+4096)
-    table.insert(zoneAnchors[1], brConfig.mapCentre[2]*8192+4096)
-    
-    -- define circle centres
-    for zone=1,#brConfig.fogZoneSizes do
-        zoneAnchors[zone+1] = {}
-
-        --centreCell = mapLogic.CoordinatesToCell(zoneAnchors[zone-1][1], zoneAnchors[zone-1][2])
-        -- maneuver space for next centre is fogZoneSizes[zone-1]-fogZoneSizes[zone]
-        -- we are not using radiusOfZoneForPotentialNextCentre because it's awful name
-        -- since we are trying to find random spot in a circle, we are basically playing darts, and
-        dartsAreaRadius = brConfig.fogZoneSizes[zone-1]-brConfig.fogZoneSizes[zone]
-        random_x = math.random(-dartsAreaRadius,dartsAreaRadius)
-        -- TODO: learn trigonometry
-        random_y = 0
-        table.insert(zoneAnchors[zone+1], random_x*8192)
-        table.insert(zoneAnchors[zone+1], random_y*8192)
-
-    end
-    
-    
-    -- translate each circle into cells
-    for anchor=1,#zoneAnchors do
-        brDebug.Log(1, "anchor" .. tostring(anchor) .. "x: " .. tostring(zoneAnchors[1]))
-    end
-end
-
-getzoneforcell:
-    cellZone = nil
-    for zone=#zoneAnchors, 1, -1 do
-        brDebug.Log(1, "distance: " .. tostring(mapLogic.DistanceBetweenPositions(zoneAnchors[zone][1], zoneAnchors[zone][2], x, y)))
-        brDebug.Log(1, "zone size: " .. tostring(brConfig.fogZoneSizes[zone]*8192))
-        if zone > 1 and mapLogic.DistanceBetweenPositions(zoneAnchors[zone][1], zoneAnchors[zone][2], x, y) < brConfig.fogZoneSizes[zone]*8192 then
-            return zone
-        end
-    end
-    return 1
-
-showzones:
-
-    currentTileIndex = 1
-    --mapLogic.GetZoneForCell
-    
-    for x=brConfig.mapBorders[1][1],brConfig.mapBorders[2][1] do
-	    for y=brConfig.mapBorders[1][2],brConfig.mapBorders[2][2] do
-            zone = mapLogic.GetZoneForCell(x, y)
-            if zone then
-                brDebug.Log(4, "Colouring tile " .. x .. ", " .. y )
-                filePath = tes3mp.GetDataPath() .. "/map/fog" .. tostring(math.fmod(zone,3)+1) .. ".png"
-                tes3mp.LoadMapTileImageFile(x, y, filePath)
-            end
-        end
-    end
-
-    for _, zone in pairs(zoneAnchors) do
-        for x=zone[1][1],zone[2][1] do
-            for y=zone[1][2],zone[2][2] do
-                brDebug.Log(4, "Colouring tile " .. x .. ", " .. y )
-                filePath = tes3mp.GetDataPath() .. "/map/fog" .. tostring(currentTileIndex) .. ".png"
-                tes3mp.LoadMapTileImageFile(x, y, filePath)
-            end
-        end
-
-    end
-
-]]
 
 return mapLogic

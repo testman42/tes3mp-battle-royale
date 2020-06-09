@@ -42,9 +42,11 @@ end
 
 -- force the next stage of shrinking process regardless of the remaining time
 debug.ForceNextFog = function(pid)
-	if #brConfig.stageDurations >= matchLogic.GetCurrentStage() + 1 then
-		matchLogic.ForceAdvanceZoneShrink()
-	end
+    if brConfig.debugLevel > 0 then
+        if #brConfig.stageDurations >= matchLogic.GetCurrentStage() + 1 then
+            matchLogic.ForceAdvanceZoneShrink()
+        end
+    end
 end
 
 -- used to manually clear map

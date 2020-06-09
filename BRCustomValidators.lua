@@ -5,6 +5,7 @@ customEventHooks.registerValidator("OnPlayerCellChange", function(eventStatus, p
     if mapLogic.ValidateCell(pid) then
         return customEventHooks.makeEventStatus(true,true)
     else
+        playerLogic.WarnPlayerAboutInterior(pid)
         return customEventHooks.makeEventStatus(false,true)
     end
 

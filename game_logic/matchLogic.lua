@@ -122,10 +122,9 @@ end
 
 matchLogic.StartAirdrop = function()
     brDebug.Log(3, "Starting airdrop")
-    --airmode = #brConfig.airDropStages
-    -- TODO: think again if maybe highest-to-lowest should be kept
     airmode = 1
 	matchLogic.HandleAirMode()
+    tes3mp.SendMessage(playerList[1], "You have " .. tostring(brConfig.airDropStages[1][1]) .. " seconds of speed boost.\n", true)
 end
 
 matchLogic.HandleAirMode = function()
@@ -194,6 +193,17 @@ matchLogic.GetPlayerList = function()
   return playerList
 end
 
+matchLogic.PrintRemainingPlayers = function()
+    
+end
+
+matchLogic.InformPlayersAboutStageProgress = function(pid, damageLevel)
+    message = "Zone shrink stage " .. color.Yellow .. tostring(currentFogStage) .. 
+        color.White .. "/" .. tostring(#brConfig.stageDurations) .. ". " .. color.Yellow .. 
+        tostring(#playerList) .. color.White .. " players still alive.\n"
+    tes3mp.SendMessage(playerList[1], message, true)
+end
+
 matchLogic.UpdateZoneBorder = function()
     
     if currentFogStage > 2 then
@@ -227,6 +237,8 @@ end
 function AdvanceZoneShrink()
     
     currentFogStage = currentFogStage + 1
+    
+    matchLogic.InformPlayersAboutStageProgress()
     
     brDebug.Log(3, "Updating map")
     mapLogic.UpdateMap()

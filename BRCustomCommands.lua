@@ -1,4 +1,6 @@
 customCommandHooks.registerCommand("newmatch", brDebug.StartMatchProposal)
+--customCommandHooks.registerCommand("br", playerLogic.ListPlayers)
+customCommandHooks.registerCommand("list", playerLogic.ListPlayers)
 customCommandHooks.registerCommand("ready", lobbyLogic.PlayerConfirmParticipation)
 customCommandHooks.registerCommand("forcestart", brDebug.StartMatch)
 customCommandHooks.registerCommand("forcenextfog", matchLogic.ForceAdvanceZoneShrink)

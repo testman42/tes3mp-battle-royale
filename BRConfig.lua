@@ -3,11 +3,36 @@ brConfig = {}
 brConfig.scriptName = "TES3MP-Battle-Royale"
 
 brConfig.defaultConfig = {
+    
     debugLevel = 0,
     fogWarnFilePath = tes3mp.GetDataPath() .. "/map/fogwarn.png",
     fog1FilePath = tes3mp.GetDataPath() .. "/map/fog1.png",
     fog2FilePath = tes3mp.GetDataPath() .. "/map/fog2.png",
-    fog3FilePath = tes3mp.GetDataPath() .. "/map/fog3.png"
+    fog3FilePath = tes3mp.GetDataPath() .. "/map/fog3.png",
+    -- TODO: will this even work?
+    fogFilePaths = {fogWarnFilePath, fog1FilePath, fog2FilePath, fog3FilePath},
+    
+    -- default stats for players
+    defaultStats = {
+        playerLevel = 1,
+        playerAttributes = 80,
+        playerSkills = 80,
+        playerHealth = 200,
+        playerMagicka = 100,
+        playerFatigue = 300,
+        playerLuck = 100,
+        playerSpeed = 100,
+        playerAcrobatics = 75,
+        playerMarksman = 150
+    },
+    
+    -- defines the type and size of each zone
+    -- zones are either cell-based or geometry-based. 0 = cell, 1 = geo
+    -- size of zone is *diameter* of the zone. One cell unit is 8192 geometry units {type, units}
+    -- the last one has size of 0, which results in a single cell (provided cell-centre-based logic)
+    zoneSizes = {{0, 14},{0,10},{0,6},{0,3},{0,1},{0,0}}
+    
+    
 
 }
 
@@ -69,10 +94,10 @@ playerMarksman = 150
 brConfig.zoneSizes = {{0, 14},{0,10},{0,6},{0,3},{0,1},{0,0}}
 
 -- Actual attempt
---stageDurations = {500, 400, 240, 120, 90, 60, 30, 0}
+stageDurations = {500, 400, 240, 120, 90, 60, 30, 30, 30, 0}
 -- Debug durations, first one for automatic quick iteration, second one for manual control
 --stageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
-brConfig.stageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
+--brConfig.stageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
 
 -- determines the order of how levels increase damage
 -- TODO: Would it make more sense to abandon this and instead map values to integers
@@ -114,29 +139,15 @@ brConfig.lobbyCoordinates = {2177.776367, 653.002380, -184.874023}
 brConfig.fogName = "Blight storm" 
 --fogName = "Blizzard"
 
--- TODO: depricate this spaghetti system, put all data in config and use cleaner function
 -- how long does each stage last, in seconds
--- enter values in reverse, because airmode is used as index
--- since airmode gets decreased over time, this array gets used from last value to first
 -- 15 is about how much time it takes to fall from spawn to the top of Red Mountain. 
 -- 30 should be enough to fall to any ground safely
 -- - apparenlty it is not because of some networking / performance thing. 40 should really be enough though
--- TODO: does anyone want this to be in ascending order? We could use #airDropStageTimes - airmode + 1 to achieve this.
-brConfig.airDropStageTimes = {40, 25}
---airDropStageTimes = {35, 2500}
-
 -- code assumes this config is valid, so don't mess it up
 -- airDropStages[stage] = {duration, playerSpeed, enableSlowfall}
 brConfig.airDropStages = {}
 brConfig.airDropStages[1] = {25, 3000, true}
 brConfig.airDropStages[2] = {40, -1, true}
-
--- list of weapons used to generate random loot
--- TODO: this is more complex than just one list, loot tables will require more lists
---weaponList = {}
-
--- list of armor used to generate random loot
---armorList = {}
 
 -- loot tables
 -- "loot tables" in vanilla game: https://en.uesp.net/wiki/Morrowind:Leveled_Lists

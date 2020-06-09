@@ -169,8 +169,6 @@ playerLogic.UpdateDamageLevel = function(pid)
         brDebug.Log(1, "New damage level is 0")
 		playerLogic.SetFogDamageLevel(pid, 0)
     else
-        -- TODO: ugly quick fix for off-by-one indexing, rewrite in decent way
-        --newDamageLevel = newDamageLevel + 1
         -- there are only 3 damage levels
         if newDamageLevel > 3 then
             newDamageLevel = 3
@@ -204,6 +202,10 @@ end
 
 playerLogic.DropAllItems = function(pid, damageLevel)
     
+end
+
+playerLogic.WarnPlayerAboutInterior = function(pid)
+    tes3mp.SendMessage(pid, "You can not enter interiors during this match.\n", false)
 end
 
 playerLogic.SetAirMode = function(pid, mode)
@@ -282,6 +284,58 @@ end
 playerLogic.SendMapToPlayer = function(pid)
 	tes3mp.LogMessage(2, "Sending map to PID " .. tostring(pid))
 	tes3mp.SendWorldMap(pid)
+end
+
+-- TODO: would it be better to call non-modified function if there is no match going on?
+local GetConnectedPlayerList = function()
+
+    local lastPid = tes3mp.GetLastPlayerId()
+    local matchTitle = "Players in match:\n"
+    local lobbyTitle = "Players in lobby:\n"
+    local matchList = ""
+    local lobbyList = ""
+    local separator = ""
+    local divider = ""
+
+    for playerIndex = 0, lastPid do
+        if playerIndex == lastPid then
+            divider = ""
+        else
+            divider = "\n"
+        end
+        if Players[playerIndex] ~= nil and Players[playerIndex]:IsLoggedIn() then
+            if matchLogic.IsPlayerInMatch(playerIndex) then
+            matchList = matchList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
+                ", ping: " .. tostring(tes3mp.GetAvgPing(Players[playerIndex].pid)) .. ")" .. divider
+            else
+            lobbyList = lobbyList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
+                ", ping: " .. tostring(tes3mp.GetAvgPing(Players[playerIndex].pid)) .. ")" .. divider
+            end
+        end
+    end
+
+    if matchList ~= "" and lobbyList ~= "" then
+        separator = "-------------\n"
+    else
+        matchTitle = ""
+        lobbyTitle = ""
+    end
+    
+    result = matchTitle .. color.SteelBlue .. matchList .. "#caa560" .. separator .. lobbyTitle .. lobbyList
+    return  result
+end
+
+playerLogic.ListPlayers = function(pid)
+    
+    local playerCount = logicHandler.GetConnectedPlayerCount()
+    local label = playerCount .. " connected player"
+
+    if playerCount ~= 1 then
+        label = label .. "s"
+    end
+
+    tes3mp.ListBox(pid, guiHelper.ID.PLAYERSLIST, label, GetConnectedPlayerList())
+
 end
 
 return playerLogic
