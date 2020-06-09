@@ -25,3 +25,6 @@
 [submodule "dependencies/SupportTickets"]
 	path = dependencies/SupportTickets
 	url = https://github.com/tes3mp-scripts/SupportTickets
+[submodule "dependencies/ContainerFramework"]
+	path = dependencies/ContainerFramework
+	url = https://github.com/tes3mp-scripts/ContainerFramework
