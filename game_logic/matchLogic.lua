@@ -116,7 +116,7 @@ matchLogic.RemoveOfflinePlayersFromPlayerList = function()
     for index, pid in pairs(playerList) do
         if not Players[pid]:IsLoggedIn() then
             matchLogic.RemovePlayerFromPlayerList(pid)
-        end
+        endis
     end
 end
 

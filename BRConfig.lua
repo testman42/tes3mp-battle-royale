@@ -94,7 +94,7 @@ playerMarksman = 150
 brConfig.zoneSizes = {{0, 14},{0,10},{0,6},{0,3},{0,1},{0,0}}
 
 -- Actual attempt
-stageDurations = {500, 400, 240, 120, 90, 60, 30, 30, 30, 0}
+brConfig.stageDurations = {500, 400, 240, 120, 90, 60, 30, 30, 30, 0}
 -- Debug durations, first one for automatic quick iteration, second one for manual control
 --stageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
 --brConfig.stageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}

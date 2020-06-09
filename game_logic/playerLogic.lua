@@ -305,10 +305,10 @@ local GetConnectedPlayerList = function()
         end
         if Players[playerIndex] ~= nil and Players[playerIndex]:IsLoggedIn() then
             if matchLogic.IsPlayerInMatch(playerIndex) then
-            matchList = matchList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
+                matchList = matchList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
                 ", ping: " .. tostring(tes3mp.GetAvgPing(Players[playerIndex].pid)) .. ")" .. divider
             else
-            lobbyList = lobbyList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
+                lobbyList = lobbyList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
                 ", ping: " .. tostring(tes3mp.GetAvgPing(Players[playerIndex].pid)) .. ")" .. divider
             end
         end
