@@ -85,6 +85,7 @@ matchLogic.End = function()
     -- respawn player in lobby
     playerLogic.PlayerInit(playerList[1], true)
     Players[playerList[1]]:Save()
+    FullLoot.destroyAllDeathContainers()
     
     -- clear playerList only *after* all the player-relates stuff above is handled
     playerList = {}
@@ -116,7 +117,7 @@ matchLogic.RemoveOfflinePlayersFromPlayerList = function()
     for index, pid in pairs(playerList) do
         if not Players[pid]:IsLoggedIn() then
             matchLogic.RemovePlayerFromPlayerList(pid)
-        endis
+        end
     end
 end
 
