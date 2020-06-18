@@ -47,11 +47,13 @@ playerLogic.SpawnPlayerInMatch = function(pid)
 
 end
 
+-- move player to lobby cell
 playerLogic.SpawnPlayerInLobby = function(pid)
     tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " in lobby")
     PlayerLobby.teleportToLobby(pid)
 end
 
+-- check what changes to apply now that player crossed cell border
 playerLogic.ProcessCellChange = function(pid)
 	tes3mp.LogMessage(2, "Processing cell change for PID " .. tostring(pid))
 	if Players[pid] ~= nil and Players[pid]:IsLoggedIn() and matchLogic.IsPlayerInMatch(pid) then
@@ -61,6 +63,7 @@ playerLogic.ProcessCellChange = function(pid)
 	end
 end
 
+-- reset player to default
 playerLogic.ResetCharacter = function(pid)
     playerLogic.ResetCharacterStats(pid)
     playerLogic.ResetCharacterItems(pid)
@@ -71,6 +74,7 @@ playerLogic.PlayerSpells = function(pid)
 
 end
 
+-- give player relevant items
 playerLogic.PlayerItems = function(pid)
 	tes3mp.LogMessage(2, "Loading items for " .. tostring(pid))
     playerLogic.LoadPlayerOutfit(pid)
@@ -79,6 +83,7 @@ playerLogic.PlayerItems = function(pid)
 	Players[pid]:LoadEquipment()
 end
 
+-- return player stats to default
 playerLogic.ResetCharacterStats = function(pid)
     tes3mp.LogMessage(2, "Resetting stats for " .. Players[pid].data.login.name .. ".")
 
@@ -123,6 +128,7 @@ playerLogic.ResetCharacterStats = function(pid)
 	Players[pid]:LoadStatsDynamic()
 end
 
+-- return player's inventory to default
 playerLogic.ResetCharacterItems = function(pid)
     if Players[pid]:IsLoggedIn() then
         Players[pid].data.inventory = {}
@@ -152,6 +158,7 @@ playerLogic.LoadPlayerOutfit = function(pid)
 	Players[pid].data.equipment[9] = { refId = "common_pants_01", count = 1, charge = -1 }
 end
 
+-- apply damage level of the cell that player is in
 playerLogic.UpdateDamageLevel = function(pid)
     brDebug.Log(1, "Updating damage level for PID " .. tostring(pid))
     playerCell = tes3mp.GetCell(pid)
@@ -204,10 +211,12 @@ playerLogic.DropAllItems = function(pid, damageLevel)
     
 end
 
+-- display a message to player about blocked interior cells
 playerLogic.WarnPlayerAboutInterior = function(pid)
     tes3mp.SendMessage(pid, "You can not enter interiors during this match.\n", false)
 end
 
+-- set player stats and slowfall to the ones determined by stage of air-drop
 playerLogic.SetAirMode = function(pid, mode)
     brDebug.Log(1, "Setting airmode for PID " .. tostring(pid) .. " to " .. tostring(mode))
     if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
@@ -267,6 +276,7 @@ playerLogic.SetSpeed = function(pid, speed)
 
 end
 
+-- handle player death
 playerLogic.ProcessDeath = function(pid)
     brDebug.Log(1, "Processing death for PID " .. tostring(pid))
 	if matchLogic.IsPlayerInMatch(pid) then
@@ -286,6 +296,7 @@ playerLogic.SendMapToPlayer = function(pid)
 	tes3mp.SendWorldMap(pid)
 end
 
+-- returns list of online players, splits it into players in match and players in lobby if match is going on
 -- TODO: would it be better to call non-modified function if there is no match going on?
 local GetConnectedPlayerList = function()
 
@@ -297,7 +308,7 @@ local GetConnectedPlayerList = function()
     local separator = ""
     local divider = ""
 
-    for playerIndex = 0, lastPid do
+    for playerIndex = 0,lastPid do
         if playerIndex == lastPid then
             divider = ""
         else
@@ -325,6 +336,7 @@ local GetConnectedPlayerList = function()
     return  result
 end
 
+-- displays player list
 playerLogic.ListPlayers = function(pid)
     
     local playerCount = logicHandler.GetConnectedPlayerCount()

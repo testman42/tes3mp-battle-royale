@@ -22,6 +22,14 @@ fogShrinkRemainingTime = 0
 -- used for handling the stages of player movement at the start of the match
 airmode = 0
 
+-- timer used for zone shrink countdown
+-- global variable because we have to have access to it in matchLogic.End
+fogtimer = nil
+
+-- pools of item IDs used for distribution of unique items when placing loot
+-- each tier being it's own pool
+uniqueItemIDs = {}
+
 -- Used to initiate next step of the air-drop process
 function HandleAirTimerTimeout()
     brDebug.Log(2, "AirTimer Timeout")
@@ -38,7 +46,9 @@ matchLogic.Start = function()
     for key, value in pairs(lobbyLogic.GetReadyList()) do
         table.insert(playerList, value)
     end
-
+    
+    debug.DeleteExteriorCellData()
+    
     mapLogic.GenerateZones()
 
     matchLogic.StartZoneShrinkProcess()
@@ -89,6 +99,9 @@ matchLogic.End = function()
     
     -- clear playerList only *after* all the player-relates stuff above is handled
     playerList = {}
+    
+    -- stop zone shrink timer
+    tes3mp.StopTimer(fogTimer)
     
     if brConfig.automaticMatchmaking then
         lobbyLogic.StartMatchProposal()
@@ -165,7 +178,7 @@ matchLogic.StartZoneShrinkTimerForStage = function(stage)
     end
 end
 
-
+-- returns the value that zone deals at the current stage
 matchLogic.GetDamageLevelForZone = function(zone)
     damageLevel = brConfig.stageDamageLevels[currentFogStage-zone-1]
     if currentFogStage-zone-1 > #brConfig.stageDamageLevels then
@@ -181,7 +194,7 @@ matchLogic.GetDamageLevelForCell = function(x, y)
     return matchLogic.GetDamageLevelForZone(zone)
 end
 
--- for debug purposes
+-- for debug purposes, not used outside of brDebug
 matchLogic.ForceAdvanceZoneShrink = function()
     AdvanceZoneShrink()
 end
@@ -194,10 +207,6 @@ matchLogic.GetPlayerList = function()
   return playerList
 end
 
-matchLogic.PrintRemainingPlayers = function()
-    
-end
-
 matchLogic.InformPlayersAboutStageProgress = function(pid, damageLevel)
     message = "Zone shrink stage " .. color.Yellow .. tostring(currentFogStage) .. 
         color.White .. "/" .. tostring(#brConfig.stageDurations) .. ". " .. color.Yellow .. 
@@ -205,6 +214,7 @@ matchLogic.InformPlayersAboutStageProgress = function(pid, damageLevel)
     tes3mp.SendMessage(playerList[1], message, true)
 end
 
+-- removes the existing ghostfence meshes and places new ones in appropriate positions
 matchLogic.UpdateZoneBorder = function()
     
     if currentFogStage > 2 then
@@ -217,24 +227,94 @@ matchLogic.UpdateZoneBorder = function()
     
 end
 
--- TODO: fix this abomination, make it account for empty tables
-matchLogic.GetRandomLoot = function(loot_type, loot_tier)
-    if not loot_type then
-        -- lol I'm sorry, I thought this was a decent programming language
-        -- I miss Python
-        --loot_type = math.random(#lootTables)
-        loot_types = {"armor", "weapons", "potions", "scrolls", "ingredients"}
-        loot_type = loot_types[math.random(1,5)]
-    end
+-- currently just creates a list of unique items and shuffles it
+matchLogic.PrepareLootTables = function()
 
-    if not loot_tier then
-        brDebug.Log(3, "loot_type: " .. tostring(loot_type))
-        loot_tier = math.random(1,#brConfig.lootTables[loot_type])
+    uniqueItemIDs = {{}, {}, {}, {}}
+
+    if brConfig.allowUniqueItems then
+        for tier=1,4 do
+            if #brConfig.lootTables.unique[tier] > 0 then
+                for key, value in pairs(brConfig.lootTables.unique[tier]) do
+                    table.insert(uniqueItemIDs[tier], value)
+                end
+                
+                -- shuffle the positions in each tier table so that they get chosen in random order
+                if #brConfig.lootTables.unique[tier] >= 2  then
+                    for i = #uniqueItemIDs[tier], 2, -1 do
+                        local j = math.random(i)
+                        uniqueItemIDs[tier][i], uniqueItemIDs[tier][j] = uniqueItemIDs[tier][j], uniqueItemIDs[tier][i]
+                    end
+                end
+            end
+        end
     end
-    
-    return brConfig.lootTables[loot_type][loot_tier][math.random(#brConfig.lootTables[loot_type][loot_tier])]
 end
 
+-- returns a table of item IDs
+matchLogic.GetRandomLoot = function(itemCount, uniqueItemCount, lootType, lootTier)
+    
+    local randomLoot = {}
+    
+    -- add generic items
+    for i = 1,itemCount do
+        table.insert(randomLoot, matchLogic.GetRandomGenericItem(lootType, lootTier))
+    end
+    
+    -- add unique items
+    for i = 1,uniqueItemCount do
+        --local randomUniqueItem = matchLogic.GetRandomUniqueItem(lootType, lootTier)
+        local randomUniqueItem = matchLogic.GetRandomUniqueItem(lootTier)
+        -- check if function even returned anything, since it is possible to run out of unique items
+        if randomUniqueItem then
+            table.insert(randomLoot, randomUniqueItem)
+        end
+    end
+    
+    return randomLoot
+    
+end
+
+-- returns random item from requested category in loot tables
+matchLogic.GetRandomGenericItem = function(lootType, lootTier)
+    
+    local itemCount
+    local itemID
+    
+    if not lootType then
+        lootTypes = {"armor", "weapons", "potions", "scrolls", "ingredients"}
+        lootType = lootTypes[math.random(1,5)]
+    end
+
+    if not lootTier then
+        brDebug.Log(3, "loot_type: " .. tostring(lootType))
+        lootTier = math.random(1,#brConfig.lootTables[lootType])
+    end
+    
+    return brConfig.lootTables[lootType][lootTier][math.random(#brConfig.lootTables[lootType][lootTier])]
+end
+
+
+-- change logic here once unique items are split by type in config
+--matchLogic.GetRandomUniqueItem = function(lootType, lootTier)
+matchLogic.GetRandomUniqueItem = function(lootTier)
+
+    if not lootTier then
+        brDebug.Log(3, "setting random loot tier")
+        lootTier = math.random(1,4)
+    end
+
+    if #uniqueItemIDs[lootTier] > 0 then
+        -- take last element of uniqueItemIDs[lootTier] and add it to randomLoot
+        local uniqueItemID = uniqueItemIDs[lootTier][#uniqueItemIDs[lootTier]]
+        -- then remove it from the pool
+        table.remove(uniqueItemIDs[lootTier], #uniqueItemIDs[lootTier])
+        return uniqueItemID
+    end
+
+end
+
+-- logic for next shrink stage
 function AdvanceZoneShrink()
     
     currentFogStage = currentFogStage + 1

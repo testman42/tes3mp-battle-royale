@@ -31,6 +31,7 @@ mapLogic.GenerateZones = function()
     end
 end
 
+-- return X and Y coordinate of the cell where position is located in
 mapLogic.GetCellForPosition = function(x, y)
     cell = {}
     cell[1] = math.floor(x/8192)
@@ -89,8 +90,6 @@ mapLogic.GetCellsInZone = function(zone)
     return cellsInZone
 end
 
-
-
 -- replace the current zone-marking tiles with the normal (vanilla) ones
 mapLogic.ResetMapTiles = function(steps, delay)
 	tes3mp.LogMessage(2, "Resetting map tiles")
@@ -123,6 +122,7 @@ mapLogic.ShowZones = function()
     end
 end
 
+-- prepares tiles in world map to reflect the state of zone shrink
 mapLogic.UpdateMap = function()
     
     tes3mp.ClearMapChanges()
@@ -143,6 +143,7 @@ mapLogic.UpdateMap = function()
     
 end
 
+-- sets up a ghostfence-looking wall around the given group of cells
 mapLogic.PlaceBorderAroundZone = function(zone)
     
         --mapLogic.PlaceCellBorders(x, y, true, false, false, false)
@@ -188,6 +189,7 @@ mapLogic.PlaceBorderAroundZone = function(zone)
     end
 end
 
+-- deletes the objects that are currently tracked in cellBorderObjects
 mapLogic.RemoveCurrentBorder = function()
     
     if #testBR.trackedObjects["cellBorderObjects"] > 0 then
@@ -214,6 +216,7 @@ mapLogic.PlaceCellBorders = function(cell_x, cell_y, top, bottom, left, right)
     end
 end
 
+-- determines which of the two cells will host the mesh and places a ghostfence mesh on the border between the given cells
 mapLogic.PlaceBorderBetweenCells = function(cell1_x, cell1_y, cell2_x, cell2_y)
     local horisontal_border = nil
     -- 3.14159 (pi) is 180 degrees, 1.5708 is 90 degrees
@@ -303,35 +306,96 @@ mapLogic.PlaceObject = function(object_id, cell, x, y, z, rot_x, rot_y, rot_z, s
 	LoadedCells[cell]:Save()
 end
 
+-- places loot at the positions defined in config file
 mapLogic.SpawnLoot = function()
-    for _, entry in pairs(brConfig.lootSpawnLocations) do
-        -- adjusted for X, Z, Y
-        mapLogic.SpawnLootAroundPosition(entry[1], entry[2], entry[4], entry[3], 0)
-    end
-end
-
-mapLogic.SpawnLootContainerAtPosition = function(cell, x, y, z, rot_z, lootType, lootTier)
     
-end
-
-mapLogic.SpawnLootAroundPosition = function(cell, x, y, z, rot_z, lootType, lootTier)
-    local amount_of_loot = math.random(4,8)
-    local spacing = 50
-    local x_offset = 0
-    local y_offset = 0
-    for i=1,amount_of_loot do
-        local object_id = matchLogic.GetRandomLoot()
-        mapLogic.PlaceItem(object_id, cell, x+x_offset*spacing, y+y_offset*spacing, z+10, rot_z, testBR.trackedObjects["spawnedItems"], 1, -1)
-        x_offset = x_offset + 1
-        if x_offset > 3 then
-            x_offset = 0
-            y_offset = y_offset + 1
+    matchLogic.PrepareLootTables()
+    
+    for key, spawnArea in pairs(brConfig.lootSpawnAreas) do
+        
+         brDebug.Log(1, "Spawning loot in area: " .. key )
+        
+        -- create a table of all possible position indexes
+        local positionIndexTable = {{}, {}, {}, {}}
+        for tier=1,4 do
+            for i=1,#spawnArea.lootSpawnPositions[tier] do
+                table.insert(positionIndexTable[tier], i)
+            end
+            
+            -- shuffle the positions in each tier table so that they get chosen in random order
+            if #positionIndexTable[tier] >= 2 then
+                for i = #positionIndexTable[tier], 2, -1 do
+                    local j = math.random(i)
+                    positionIndexTable[tier][i], positionIndexTable[tier][j] = positionIndexTable[tier][j], positionIndexTable[tier][i]
+                end
+            end
+        end
+        
+        --{"-2, 2", -11607.515625, 1345.39453125, 19497.453125, type(optional) }
+        for tier=1,4 do
+            local containerCount = spawnArea.containerCount[tier]
+            local groundLootCount = spawnArea.groundLootCount[tier]
+            local uniqueItemCount = spawnArea.uniqueItemCount[tier]
+            for index, positionIndex in pairs(positionIndexTable[tier]) do
+                
+                local position = spawnArea.lootSpawnPositions[tier][positionIndex]
+                
+                -- determine the amount of unique items to spawn at current locatiom
+                local uniqueItemsOnPosition = 0
+                if uniqueItemCount > 0 then
+                    uniqueItemsOnPosition = 1
+                    uniqueItemCount = uniqueItemCount - 1
+                end
+                
+                if containerCount > 0 then
+                    local randomMargin = math.random(0,4)
+                    local randomLoot = matchLogic.GetRandomLoot(4+randomMargin, uniqueItemsOnPosition, position[6], tier)
+                    mapLogic.SpawnLootContainer(position[1], position[2], position[4], position[3], position[5], randomLoot, tier)
+                    containerCount = containerCount - 1
+                    
+                elseif groundLootCount > 0 then
+                    local randomMargin = math.random(0,2)
+                    local randomLoot = matchLogic.GetRandomLoot(2+randomMargin, uniqueItemsOnPosition, position[6], tier)
+                    mapLogic.SpawnLootAroundPosition(position[1], position[2], position[4], position[3], position[5], randomLoot)
+                    groundLootCount = groundLootCount - 1
+                    
+                else
+                    -- all requirements satisfied, nothing left to spawn
+                    break
+                end
+            end
         end
     end
-   
+    
+    mapLogic.SaveAllLoadedCells()
 end
 
-mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, list, item_count, item_charge)
+-- TODO: make this actually work as intended
+mapLogic.SpawnLootContainer = function(cell, x, y, z, rot_z, lootList, tier)
+    --containerID = nil
+    --table.insert(testBR.trackedObjects.spawnedLootContainers, containerID)
+    mapLogic.SpawnLootAroundPosition(cell, x, y, z, rot_z, lootList)
+end
+
+-- places items around the given coordinates
+-- first one exactly at the giveen position and rest of the items around it
+-- TODO: edge case: this will not work as intended if position is too close to cell border
+-- maybe check if x and y are too close to 8192x ?
+mapLogic.SpawnLootAroundPosition = function(cell, x, y, z, rot_z, lootList)
+    local spawnAreaSize = 30
+    for index, item in pairs(lootList) do
+        local x_offset = 0
+        local y_offset = 0
+        if index > 1 then
+            x_offset = math.sin(index*20)*spawnAreaSize
+            y_offset = math.cos(index*20)*spawnAreaSize
+        end
+        mapLogic.PlaceItem(item, cell, x+x_offset, y+y_offset, z+10, rot_z, testBR.trackedObjects["spawnedItems"], 1, -1, true)
+    end
+end
+
+-- place the given object in the world
+mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, list, item_count, item_charge, skipCellSave)
     brDebug.Log(3, "Placing item " .. tostring(object_id) .. " in cell " .. tostring(cell))
     brDebug.Log(3, "x: " .. tostring(x) .. ", y: " .. tostring(y) .. ", z: " .. tostring(z))
 	local mpNum = WorldInstance:GetCurrentMpNum() + 1
@@ -375,9 +439,12 @@ mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, list, item_count,
 			tes3mp.SendObjectPlace()
 		end
 	end
-	LoadedCells[cell]:Save()
+    if not skipCellSave then
+        LoadedCells[cell]:Save()
+    end
 end
 
+-- removes the given object
 mapLogic.DeleteObject = function(cellName, objectUniqueIndex)
     if cellName and LoadedCells[cellName] then
         LoadedCells[cellName]:DeleteObjectData(objectUniqueIndex)
@@ -406,8 +473,17 @@ mapLogic.ResetWorld = function()
         end
     end
     
+    debug.DeleteExteriorCellData()
+    
 end
 
+-- writes to disk all the loaded cell data
+-- used so that we don't write to disk for every change in cell during match start
+mapLogic.SaveAllLoadedCells = function()
+    for index, cell in pairs(LoadedCells) do
+        cell:Save()
+    end
+end
 
 -- checks if player is allowed to be in the cell
 mapLogic.ValidateCell = function(pid)

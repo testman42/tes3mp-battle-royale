@@ -1,6 +1,6 @@
 
 -- Battle Royale game mode by testman
--- debug module v0.6
+-- debug module v0.7
 
 debug = {}
 
@@ -67,5 +67,12 @@ debug.ResetMapTiles = function(pid)
     end
 end
 
+debug.DeleteExteriorCellData = function()
+    for x=brConfig.mapBorders[1][1],brConfig.mapBorders[2][1] do
+        for y=brConfig.mapBorders[1][2],brConfig.mapBorders[2][2] do
+            os.remove(tes3mp.GetDataPath() .. "/cell/" .. x .. ", " .. y .. ".json")
+        end
+    end
+end
 
 return debug

@@ -62,7 +62,12 @@ lobbyLogic.StartMatchProposal = function()
             reasonMessage = "New match proposal was not started because one is already in progress.\n"
         end
         if #Players > 0 then
-            tes3mp.SendMessage(0, reasonMessage, true)
+            -- send message only to players in lobby, since it's not relevant to players who are already in match
+            for pid, player in pairs(Players) do
+                if Players[pid] ~= nil and Players[pid]:IsLoggedIn() then
+                    tes3mp.SendMessage(pid, reasonMessage, false)
+                end
+            end
         end
     end
 end

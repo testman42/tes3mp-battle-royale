@@ -1,6 +1,7 @@
 
 -- Battle Royale game mode by testman
 -- v0.7
+-- for TES3MP 0.7.0-alpha
 
 -- TODO: find a decent name
 testBR = {}
@@ -18,6 +19,7 @@ math.randomseed(os.time())
 DataManager = require("custom/tes3mp-battle-royale/dependencies/DataManager/main")
 PlayerLobby = require("custom/tes3mp-battle-royale/dependencies/PlayerLobby/main")
 ContainerFramework = require("custom/tes3mp-battle-royale/dependencies/ContainerFramework/main")
+DropFramework = require("custom/tes3mp-battle-royale/dependencies/DropFramework/main")
 FullLoot = require("custom/tes3mp-battle-royale/dependencies/FullLoot/main")
 brConfig = require("custom/tes3mp-battle-royale/BRConfig")
 brDebug = require("custom/tes3mp-battle-royale/BRDebug")
@@ -37,6 +39,8 @@ testBR.trackedObjects = {
 cellBorderObjects = {}, 
 -- items that get spawned at the start of the match
 spawnedItems = {},
+-- placed containers that contain loot
+spawnedLootContainers = {},
 -- items that get dropped when player dies
 droppedItems = {},
 -- items that players manually moved out of their inventory
@@ -49,7 +53,18 @@ placedItems = {}
 testBR.OnServerPostInit = function()
     -- if debug is above level 1 then write it in log
     brDebug.Log(1, "Running server in debug mode. DebugLevel: " .. tostring(brConfig.debugLevel))
+    
+    debug.DeleteExteriorCellData()
+    
+    -- make DataManager file names more readable
+    DataManager.configPrefix = "custom/config_"
+    DataManager.dataPrefix = "custom/data_"
 
+    -- set config files from dependencies to reflect values from main config file
+    PlayerLobby.config.cell = brConfig.lobbyCell
+    PlayerLobby.config.pos = brConfig.lobbyCoordinates
+    DataManager.saveData(PlayerLobby.scriptName,PlayerLobby.config)
+    
     if brConfig.automaticMatchmaking then
         lobbyLogic.StartMatchProposal()
     end
