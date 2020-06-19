@@ -13,6 +13,7 @@ mapLogic.GenerateZones = function()
         zoneAnchors[zoneIndex] = {}
         zoneRadius = zoneParameters[2]*4096
         if zoneIndex == 1 then
+            -- TODO: think about introducing some randomness to this. Few cells of random offset?
             previousAnchor = {brConfig.mapCentre[1]*8192+4096, brConfig.mapCentre[2]*8192+4096}
         else
             previousAnchor = zoneAnchors[zoneIndex-1]

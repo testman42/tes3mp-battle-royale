@@ -1,54 +1,54 @@
-Usually I like to plan out project development, but this time I went directly into the code and I got lost very quickly in a mess of concepts.
-So with this we are taking a step back and defining some things that can help make sense of this mess of a code below.
+# TES3MP Battle Royale Design Document
 
-Match start logic:
+Terminology:
+ - Fog - The area of the map that deals damage to players who are inside it. In other battle royale games it is called "Storm" (I had no better idea for how to call it.)
+ - Damage level - Penalty that player receives for being outside of the safe zone. Penalty gets higher further away player is.
+ - Zone - Group of cells that share the same damage level.
+ - Safe zone - All the zones that do not have damage level yet.
+ - Stage - Phase of process where safe zone shrinks over time. 
+ - Border - A visual indicator of where the safe zone ends.
+ - Air-drop - Process of spawning players high above the map and managing their stats / spells in a way that allows them to land safely on the ground.
+ - Loot - items that spawn across the map at the start of the match
 
-There are two stages of the lobby process.
+## Pre-match logic
 
-First one is when there is nothing happening. Players are in the lobby, they can move around, also they can fight and kill each other without consequences.
-They respawn in lobby if killed. At this stage, it is possible to initiate second stage.
-The second stage is used to determine if match can be started and which players will be participating in said match.
-The variable in the configuration section of this script determines if the players are in control of initiating the second stage or if it is controlled by server.
-The second stage lasts for the determined amount of time and at the end of that period the server checks if criteria for start of the match is met.
-Criteria 
-If initiation of second stage is controlled by the server, then the stage starts as soon as the second player logs in.
+Currently new match proposal is handled automatically.
+Server checks how many players are on the server. If more than two, then it proposes a new match.
+While in lobby, players can move around and also fight and kill each other without consequences.
+Players who wish to join the match enter `/ready` command in chat window.
+If more than two players are ready when match proposal ends, the match will start.
+If match was not started, then server will propose new match.
 
-maybe TODO: draw flowchart for this process using http://asciiflow.com/
+## Match start logic
 
-Overall logic:
+### Generate zones
+Zones take a shape of [rasterised cirlce](https://en.wikipedia.org/wiki/Midpoint_circle_algorithm). Each subsequent zone is located entirely within the previous zone.
+This is achieved by taking coordinates of previous zone centre and it's radius. Subtracting radius of next zone from the radius of current zone gives us a radius of the circle within which the centre of next zone can be located.
+Process is repeated for each diameter given in the config file.
+Config file takes diameter as opposed to radius because that way it's easier to visualise the size of the zone on the map.
+### Spawn loot
+Loot gets spawned according to the following parameters given in the config file:
+ - Loot tables - contain items sorted into categories and further sorted into tiers of usefulness (1 to 4, higher is better)
+ - Loot positions - contains coordinates and rotations of possible spawn positions. Sorted into categories and further into tiers (positions that can spawn highest tier are usually most difficult to reach)
+ - Whether unique items are enabled - if yes, items that are considered unique can spawn, but only one instance.
+### Spawn players
+Position match participants high above the ground and start the process of "air drop".
+Slowfall (5 pts) is enabled all the time during this process. In the first stage of air drop players get very increased speed, so that they can travel large distances during this time. In the second stage, player speed returns to default, but they still have slowfall enabled. After that stage slowfall gets disabled and process of airdrop is finished.
+Timing is important here. Current configuration is set up so that speed is reset around the time any player would reach the top of Red Mountain and slowfall gets disabled shortly after any player would land in water.
+### Start shrink timer
+Start a timer for first zone shrink. Should give players enough time to explore and gather some gear.
 
-players spawn in lobby (currently modified ToddTest) by default, where they can sign up for next round and wait until it starts
-once round starts, players get teleported to exterior, timers for parachuting logic and also timer for fog shrinking starts.
-From that point on we differentiate between players in lobby and players in game. Well, players who are in lobby stay like they were and
-players who are in round get to do battle royale stuff until they get killed or round ends. After that they get flagged as out of round and 
-spawn in lobby with rest of players.
+## Logic during match
+### Zone shrink logic
+Process of zone shrink goes into next stage each time a timer for previous stage runs out.
+Stage durations are determined by the values in the config file.
+Each new stage makes the following occur:
 
-fog - the thing that battle royale games have. It shrinks over time and damages players who stand in it. Most other games call it "storm" if I am not mistaken.
+ - Damage level update - The most outer zone that is still safe will become a "warning zone". The zone that is currently "warning zone" starts causing damage of level 1 to players that are still in it. Zones that are already dealing damage get their damage level increased, unless they are already at highest level. There are 3 damage levels, higher level deals more damage. 
+ - Map update - Tiles that reflect the current state of the map get sent to participants.
+ - Border update - If there are both fog and safe zone present, the border gets placed between them.
+ - Informaton display - Messsage in text chat window informs players of new stage, the duration of said stage and how many players are still left in game.
 
-fogGridLimits - an array that contains the bottom left (min X and min Y) and top right (max X and max Y) for each level
-
-fog grid - Currently used logic is square-based, but same principle could easily work for other shapes, preferably circle (https://en.wikipedia.org/wiki/Midpoint_circle_algorithm)
-Whole area gets segmented when the match starts, so that it doesn't have to determine each new zone when fog starts shrinking
-Below example is for grid with 4 levels. Each time fog shrinks, it moves one level in. and all cells in that area start dealing damage to player
-
-+------------------------------#
-| 1                            |
-|  +------------------#        |
-|  | 2    +---------# |        |
-|  |      | 3       | |        |
-|  |      | +--#    | |        |
-|  |      | | 4|    | |        |
-|  |      | #--+    | |        |
-|  |      #---------+ |        |
-|  |                  |        |
-|  |                  |        |
-|  #------------------+        |
-|                              |
-|                              |
-#------------------------------+
-(# represents the coordinates that are saved in array, + and the lines are extrapolated from the given two cells)
-
-fogZone - one set of cells. It is used to easily determine if cell that player entered should cause damage to player or not.
--- TODO: this needs to be renamed to "zone" or something like it, because overuse of the term "level" in this script is getting out of hand
-
-fogStage - basically index of fog progress
+### Player death
+Participants leave a container with all their equipment in it when they die.
+Each time a participant dies the server checks the number of remaining participants. If there is only one participant left, they are declared a winner and match is finished. Winning player gets moved to lobby as well and whole server is informed of their victory.
