@@ -152,10 +152,10 @@ brConfig.airDropStages[1] = {25, 3000, true}
 brConfig.airDropStages[2] = {40, -1, true}
 
 -- limits on how many items can spawn in loot containers (min, max)
-brConfig.containerLootLimits = {3, 6}
+brConfig.containerLootLimits = {3, 7}
 
 -- limits on how many items can spawn as ground loot per spawn position (min, max)
-brConfig.containerLootLimits = {1, 3}
+brConfig.containerLootLimits = {1, 4}
 
 -- loot tables
 -- "loot tables" in vanilla game: https://en.uesp.net/wiki/Morrowind:Leveled_Lists

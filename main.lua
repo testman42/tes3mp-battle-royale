@@ -53,8 +53,6 @@ testBR.OnServerPostInit = function()
         lobbyLogic.StartMatchProposal()
     end
     
-    mapLogic.SpawnLoot()
-    
 end
 
 

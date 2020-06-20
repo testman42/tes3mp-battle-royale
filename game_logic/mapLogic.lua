@@ -442,18 +442,18 @@ mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, item_count, item_
 	brDebug.Log(2, "Sending spawned item info to players")
 	for index, onlinePid in pairs(matchLogic.GetPlayerList()) do
 		if Players[onlinePid]:IsLoggedIn() then
-			tes3mp.InitializeEvent(onlinePid)
-			tes3mp.SetEventCell(cell)
-			tes3mp.SetObjectRefId(refId)
+            tes3mp.InitializeEvent(onlinePid)
+            tes3mp.SetEventCell(cell)
+            tes3mp.SetObjectRefId(refId)
             tes3mp.SetObjectCount(item_count)
             tes3mp.SetObjectCharge(item_charge)
             tes3mp.SetObjectEnchantmentCharge(item_charge)
-			tes3mp.SetObjectRefNumIndex(0)
-			tes3mp.SetObjectMpNum(mpNum)
-			tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
-			tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
-			tes3mp.AddWorldObject()
-			tes3mp.SendObjectPlace()
+            tes3mp.SetObjectRefNumIndex(0)
+            tes3mp.SetObjectMpNum(mpNum)
+            tes3mp.SetObjectPosition(location.posX, location.posY, location.posZ)
+            tes3mp.SetObjectRotation(location.rotX, location.rotY, location.rotZ)
+            tes3mp.AddWorldObject()
+            tes3mp.SendObjectPlace()
 		end
 	end
     if not skipCellSave then
