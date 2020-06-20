@@ -31,22 +31,6 @@ brCustomHandlers = require("custom/tes3mp-battle-royale/BRCustomHandlers")
 brCustomValidators = require("custom/tes3mp-battle-royale/BRCustomValidators")
 brCustomCommands = require("custom/tes3mp-battle-royale/BRCustomCommands")
 
--- ====================== GLOBAL VARIABLES ======================
-
--- used to track unique indexes of objects that present cell border
-testBR.trackedObjects = {
--- basically just fog_border
-cellBorderObjects = {}, 
--- items that get spawned at the start of the match
-spawnedItems = {},
--- placed containers that contain loot
-spawnedLootContainers = {},
--- items that get dropped when player dies
-droppedItems = {},
--- items that players manually moved out of their inventory
-placedItems = {}
-}
-
 -- ========================= MAIN =========================
 
 -- check the config for what type of matchmaking process is used and starts the process if needed
@@ -68,6 +52,8 @@ testBR.OnServerPostInit = function()
     if brConfig.automaticMatchmaking then
         lobbyLogic.StartMatchProposal()
     end
+    
+    mapLogic.SpawnLoot()
     
 end
 

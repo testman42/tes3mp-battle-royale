@@ -50,7 +50,7 @@ end)
 customEventHooks.registerHandler("OnPlayerEndCharGen", function(eventstatus, pid)
 	if Players[pid] ~= nil then
 		--tes3mp.LogMessage(2, "++++ Newly created: " .. tostring(pid))
-		--testBR.EndCharGen(pid)
+		playerLogic.EndCharGen(pid)
         if brConfig.automaticMatchmaking and not lobbyLogic.matchProposalInProgress and not matchLogic.matchInProgress then
             lobbyLogic.StartMatchProposal()
         end

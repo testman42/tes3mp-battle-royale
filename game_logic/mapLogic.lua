@@ -2,6 +2,20 @@ mapLogic = {}
 
 zoneAnchors = {}
 
+-- used to track unique indexes of objects that present cell border
+trackedObjects = {
+-- basically just fog_border
+cellBorderObjects = {}, 
+-- items that get spawned at the start of the match
+spawnedItems = {},
+-- placed containers that contain loot
+spawnedLootContainers = {},
+-- items that get dropped when player dies
+droppedItems = {},
+-- items that players manually moved out of their inventory
+placedItems = {}
+}
+
 mapLogic.DistanceBetweenPositions = function(x1, y1, x2, y2)
     return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
 end
@@ -193,9 +207,9 @@ end
 -- deletes the objects that are currently tracked in cellBorderObjects
 mapLogic.RemoveCurrentBorder = function()
     
-    if #testBR.trackedObjects["cellBorderObjects"] > 0 then
-        for index, entry in pairs(testBR.trackedObjects["cellBorderObjects"]) do
-            mapLogic.DeleteObject(testBR.trackedObjects["cellBorderObjects"][index][1], testBR.trackedObjects["cellBorderObjects"][index][2])
+    if #trackedObjects["cellBorderObjects"] > 0 then
+        for index, entry in pairs(trackedObjects["cellBorderObjects"]) do
+            mapLogic.DeleteObject(trackedObjects["cellBorderObjects"][index][1], trackedObjects["cellBorderObjects"][index][2])
         end
     end
 end
@@ -256,7 +270,7 @@ mapLogic.PlaceBorderBetweenCells = function(cell1_x, cell1_y, cell2_x, cell2_y)
         x_coordinate = x_coordinate + 4096
     end
     
-    mapLogic.PlaceObject("fog_border", host_cell_string, x_coordinate, y_coordinate, 4200, 0, 3.14159, rotation, 2.677, testBR.trackedObjects["cellBorderObjects"])
+    mapLogic.PlaceObject("fog_border", host_cell_string, x_coordinate, y_coordinate, 4200, 0, 3.14159, rotation, 2.677, trackedObjects["cellBorderObjects"])
 end
 
 -- used for pseudo-statics. For spawning items use mapLogic.PlaceItem, as items require more parameters
@@ -348,15 +362,16 @@ mapLogic.SpawnLoot = function()
                     uniqueItemCount = uniqueItemCount - 1
                 end
                 
+                -- if statement because one position can have either container or ground loot, can't have both
                 if containerCount > 0 then
-                    local randomMargin = math.random(0,4)
-                    local randomLoot = matchLogic.GetRandomLoot(4+randomMargin, uniqueItemsOnPosition, position[6], tier)
+                    local randomMargin = math.random(0,brConfig.containerLootLimits[2])
+                    local randomLoot = matchLogic.GetRandomLoot(brConfig.containerLootLimits[1]+randomMargin, uniqueItemsOnPosition, position[6], tier)
                     mapLogic.SpawnLootContainer(position[1], position[2], position[4], position[3], position[5], randomLoot, tier)
                     containerCount = containerCount - 1
                     
                 elseif groundLootCount > 0 then
-                    local randomMargin = math.random(0,2)
-                    local randomLoot = matchLogic.GetRandomLoot(2+randomMargin, uniqueItemsOnPosition, position[6], tier)
+                    local randomMargin = math.random(0,brConfig.containerLootLimits[2])
+                    local randomLoot = matchLogic.GetRandomLoot(brConfig.containerLootLimits[1]+randomMargin, uniqueItemsOnPosition, position[6], tier)
                     mapLogic.SpawnLootAroundPosition(position[1], position[2], position[4], position[3], position[5], randomLoot)
                     groundLootCount = groundLootCount - 1
                     
@@ -374,7 +389,7 @@ end
 -- TODO: make this actually work as intended
 mapLogic.SpawnLootContainer = function(cell, x, y, z, rot_z, lootList, tier)
     --containerID = nil
-    --table.insert(testBR.trackedObjects.spawnedLootContainers, containerID)
+    --table.insert(trackedObjects.spawnedLootContainers, containerID)
     mapLogic.SpawnLootAroundPosition(cell, x, y, z, rot_z, lootList)
 end
 
@@ -391,14 +406,15 @@ mapLogic.SpawnLootAroundPosition = function(cell, x, y, z, rot_z, lootList)
             x_offset = math.sin(index*20)*spawnAreaSize
             y_offset = math.cos(index*20)*spawnAreaSize
         end
-        mapLogic.PlaceItem(item, cell, x+x_offset, y+y_offset, z+10, rot_z, testBR.trackedObjects["spawnedItems"], 1, -1, true)
+        mapLogic.PlaceItem(item[1], cell, x+x_offset, y+y_offset, z+10, rot_z, item[2], -1, trackedObjects["spawnedItems"], true)
     end
 end
 
 -- place the given object in the world
-mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, list, item_count, item_charge, skipCellSave)
+mapLogic.PlaceItem = function(object_id, cell, x, y, z, rot_z, item_count, item_charge, list, skipCellSave)
     brDebug.Log(3, "Placing item " .. tostring(object_id) .. " in cell " .. tostring(cell))
     brDebug.Log(3, "x: " .. tostring(x) .. ", y: " .. tostring(y) .. ", z: " .. tostring(z))
+    brDebug.Log(4, "item_count: " .. tostring(item_count))
 	local mpNum = WorldInstance:GetCurrentMpNum() + 1
 	local refId = object_id
     local location = {posX = x, posY = y, posZ = z, rotX = 0, rotY = 0, rotZ = rot_z}
@@ -466,7 +482,7 @@ mapLogic.ResetWorld = function()
     --testBR.ResetWeather()
 
     -- TODO: would this be more elegant with functions or is it fine to just brute-force through the list?
-    for _, category in pairs(testBR.trackedObjects) do
+    for _, category in pairs(trackedObjects) do
         for _, list in pairs(category) do
             for index, entry in pairs(list) do
                 mapLogic.DeleteObject(entry[1], entry[2])

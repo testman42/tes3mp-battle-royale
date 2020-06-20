@@ -47,7 +47,7 @@ matchLogic.Start = function()
         table.insert(playerList, value)
     end
     
-    debug.DeleteExteriorCellData()
+    --debug.DeleteExteriorCellData()
     
     mapLogic.GenerateZones()
 
@@ -91,7 +91,7 @@ matchLogic.End = function()
     matchInProgress = false
     tes3mp.SendMessage(playerList[1], color.Yellow .. Players[playerList[1]].data.login.name .. " has won the match\n", true)
     tes3mp.MessageBox(playerList[1], -1, "Winner winner CHIM for dinner")
-    Players[playerList[1]].data.BRinfo.wins = Players[playerList[1]].data.BRinfo.wins + 1
+    playerLogic.IncreaseWinCount(playerList[1])
     -- respawn player in lobby
     playerLogic.PlayerInit(playerList[1], true)
     Players[playerList[1]]:Save()
@@ -278,12 +278,12 @@ end
 -- returns random item from requested category in loot tables
 matchLogic.GetRandomGenericItem = function(lootType, lootTier)
     
-    local itemCount
-    local itemID
+    local itemCount = 1
     
     if not lootType then
-        lootTypes = {"armor", "weapons", "potions", "scrolls", "ingredients"}
-        lootType = lootTypes[math.random(1,5)]
+        lootTypes = {"armor", "potions", "weapons", "scrolls", "projectiles"}
+        -- this math wizardry makes it so that projectiles have a very small chance of spawning
+        lootType = lootTypes[math.ceil((math.random(105)/30)+0.5)+math.floor(math.random(11)/10)]
     end
 
     if not lootTier then
@@ -291,7 +291,11 @@ matchLogic.GetRandomGenericItem = function(lootType, lootTier)
         lootTier = math.random(1,#brConfig.lootTables[lootType])
     end
     
-    return brConfig.lootTables[lootType][lootTier][math.random(#brConfig.lootTables[lootType][lootTier])]
+    if lootType == "projectiles" then
+        itemCount = math.random(1,3)*10
+    end
+    
+    return {brConfig.lootTables[lootType][lootTier][math.random(#brConfig.lootTables[lootType][lootTier])], itemCount}
 end
 
 

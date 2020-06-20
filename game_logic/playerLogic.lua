@@ -83,12 +83,50 @@ playerLogic.PlayerItems = function(pid)
 	Players[pid]:LoadEquipment()
 end
 
+-- Add battle-royale specific data to player file if it is not already present
+playerLogic.AddBRStats = function(pid)
+	tes3mp.LogMessage(2, "Verifying player data for " .. tostring(Players[pid]))
+	
+	if Players[pid].data.BRinfo == nil then
+		BRinfo = {}
+		BRinfo.lastMatchId = ""
+		BRinfo.chosenSpawnPoint = nil
+		BRinfo.team = 0
+		BRinfo.totalKills = 0
+		BRinfo.totalDeaths = 0		
+		BRinfo.wins = 0
+		BRinfo.BROutfit = {} -- used to hold data about player's chosen outfit
+		BRinfo.secretNumber = math.random(100000,999999) -- used for verification
+		Players[pid].data.BRinfo = BRinfo
+		Players[pid]:Save()
+	end
+end
+
+-- when player wins a round
+playerLogic.IncreaseWinCount = function(pid)
+    Players[pid].data.BRinfo.wins = Players[pid].data.BRinfo.wins + 1
+end
+
+-- Handle generation of new character
+playerLogic.EndCharGen = function(pid)
+	tes3mp.LogMessage(2, "Ending character generation for " .. tostring(pid))
+	Players[pid]:SaveLogin()
+	Players[pid]:SaveCharacter()
+	Players[pid]:SaveClass()
+	Players[pid]:SaveStatsDynamic()
+	Players[pid]:SaveEquipment()
+	Players[pid]:SaveIpAddress()
+	Players[pid]:CreateAccount()
+	playerLogic.AddBRStats(pid)
+    playerLogic.ResetCharacterStats(pid)
+end
+
 -- return player stats to default
 playerLogic.ResetCharacterStats = function(pid)
     tes3mp.LogMessage(2, "Resetting stats for " .. Players[pid].data.login.name .. ".")
 
 	-- Reset battle royale
-	Players[pid].data.BRinfo.team = 0
+	--Players[pid].data.BRinfo.team = 0
 	
 	-- Reset player level
 	Players[pid].data.stats.level = brConfig.defaultStats.playerLevel

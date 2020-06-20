@@ -21,8 +21,8 @@ brConfig.defaultConfig = {
         playerMagicka = 100,
         playerFatigue = 300,
         playerLuck = 100,
-        playerSpeed = 100,
-        playerAcrobatics = 75,
+        playerSpeed = 75,
+        playerAcrobatics = 70,
         playerMarksman = 150
     },
     
@@ -31,9 +31,6 @@ brConfig.defaultConfig = {
     -- size of zone is *diameter* of the zone. One cell unit is 8192 geometry units {type, units}
     -- the last one has size of 0, which results in a single cell (provided cell-centre-based logic)
     zoneSizes = {{0, 14},{0,10},{0,6},{0,3},{0,1},{0,0}}
-    
-    
-
 }
 
 brConfig.config = DataManager.loadConfiguration(brConfig.scriptName, brConfig.defaultConfig)
@@ -83,12 +80,11 @@ playerLevel = 1,
 playerAttributes = 80,
 playerSkills = 80,
 playerHealth = 200,
---playerHealth = 10000,
 playerMagicka = 100,
 playerFatigue = 300,
 playerLuck = 100,
-playerSpeed = 100,
-playerAcrobatics = 75,
+playerSpeed = 75,
+playerAcrobatics = 70,
 playerMarksman = 150
 }
 
@@ -100,7 +96,7 @@ playerMarksman = 150
 brConfig.zoneSizes = {{0, 14},{0,10},{0,6},{0,3},{0,1},{0,0}}
 
 -- Actual attempt
-brConfig.stageDurations = {500, 400, 240, 120, 90, 60, 30, 30, 30, 0}
+brConfig.stageDurations = {500, 400, 240, 120, 90, 75, 60, 60, 60, 0}
 -- Debug durations, first one for automatic quick iteration, second one for manual control
 --stageDurations = {10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
 --brConfig.stageDurations = {9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 9000, 0}
@@ -155,6 +151,12 @@ brConfig.airDropStages = {}
 brConfig.airDropStages[1] = {25, 3000, true}
 brConfig.airDropStages[2] = {40, -1, true}
 
+-- limits on how many items can spawn in loot containers (min, max)
+brConfig.containerLootLimits = {3, 6}
+
+-- limits on how many items can spawn as ground loot per spawn position (min, max)
+brConfig.containerLootLimits = {1, 3}
+
 -- loot tables
 -- "loot tables" in vanilla game: https://en.uesp.net/wiki/Morrowind:Leveled_Lists
 -- https://en.uesp.net/wiki/Morrowind:Generic_Magic_Clothing
@@ -165,38 +167,48 @@ weapons = {},
 projectiles = {},
 potions = {},
 scrolls = {},
-ingredients = {}
+ingredients = {},
+alchemyTools = {},
+clothing = {}
 }
 
 -- TODO: sort unique items by types
 brConfig.lootTables.unique[1] = {"banhammer_unique"}
 brConfig.lootTables.unique[2] = {}
 brConfig.lootTables.unique[3] = {}
-brConfig.lootTables.unique[4] = {"keening","sunder","staff_magnus_unique", "dagger_fang_unique", "spell_breaker_unique" }
-brConfig.lootTables.armor[1] = {"netch_leather_cuirass", "fur_bearskin_cuirass", "fur_cuirass", "shield of the undaunted", "iron_shield", "imperial left gauntlet", "imperial right gauntlet", "chitin_towershield", "lbonemold brace of horny fist", "rbonemold bracer of horny fist", "iron_helmet", "dust_adept_helm", "chitin greaves", "imperial_chain_pauldron_left", "imperial_chain_pauldron_right", "steel_gauntlet_left", "steel_gauntlet_right"}
-brConfig.lootTables.armor[2] = {"feather_shield", "silver_helm", "templar_greaves", "bonemold_boots", "conoon_chodala_boots_unique", "heart wall", "heavy_leather_boots", "newtscale_cuirass", "steel_towershield", "imperial_greaves", "imperial_chain_cuirass", "steel_greaves", "shield_of_light", "velothian shield", "velothis_shield", "veloths_shield", "chest of fire", "nordic_ringmail_cuirass"}
-brConfig.lootTables.armor[3] = {"dreugh_shield", "indoril pauldron left", "indoril pauldron right", "shadow_shield", "dreugh_helm", "indoril boots", "indoril shield", "orcish_towershield", "orcish_greaves", "devil cephalopod helm", "demon cephalopod", "indoril left gauntlet", "indoril right gauntlet", "devil mole crab helm"}
-brConfig.lootTables.armor[4] = {"glass_pauldron_right", "glass_boots", "helm of holy fire", "indoril cuirass", "fiend helm", "spirit of indoril", "dreugh_cuirass", "dreugh_cuirass_ttrm", "ebony_bracer_left", "ebony_bracer_left_tgeb", "ebony_bracer_right", "ebony_bracer_right_tgeb", "glass_bracer_left", "glass_bracer_right","daedric_towershield", "daedric_greaves"}
-brConfig.lootTables.weapons[1] = {"iron dagger", "iron flameblade", "steel dagger", "steel katana"}
-brConfig.lootTables.weapons[2] = {"steel vipersword", "Silver Dagger_Hanin Cursed", "icebreaker", "iron flameslayer", "iron shardaxe", "silver staff of chastening", "silver staff of hunger", "silver staff of shaming", "steel battle axe", "steel katana", "steel longbow", "nordic broadsword", "steel flamecleaver", "steel shardcleaver", "steel sparkcleaver", "steel vipercleaver", "shockbite war axe", "silver staff of peace", "silver staff of war"}
-brConfig.lootTables.weapons[3] = {"light staff", "battle axe of wounds", "dwarven axe_soultrap", "last rites", "dwarven halberd_soultrap", "merisan club", "herder_crook", "we_illkurok", "Greed", "dwarven battle axe", "steel staff of the ancestors", "warhammer of wounds", "false_sunder", "dwarven halberd"}
-brConfig.lootTables.weapons[4] = {"daedric battle axe", "daedric katana", "daedric long bow", "daedric wakizashi", "daedric wakizashi_hhst", "warhammer_crusher_unique", "longbow_shadows_unique", "daedric longsword", "glass claymore", "glass claymore_magebane", "ebony_bow_auriel", "daedric war axe", "daedric warhammer", "daedric warhammer_ttgd"}
-brConfig.lootTables.projectiles[1] = {}
-brConfig.lootTables.projectiles[2] = {}
-brConfig.lootTables.projectiles[3] = {}
-brConfig.lootTables.projectiles[4] = {"glass throwing star"}
-brConfig.lootTables.potions[1] = {"p_restore_fatigue_c", "p_restore_health_c", "p_restore_intelligence_c", "p_restore_luck_c", "p_restore_magicka_c", "p_restore_personality_c", "p_restore_speed_c", "p_restore_strength_c"}
-brConfig.lootTables.potions[2] = {"p_frost_shield_s", "p_invisibility_s", "p_jump_s", "p_light_s", "p_night-eye_s", "p_paralyze_s", "p_reflection_s", "p_restore_luck_s", "p_chameleon_s"}
-brConfig.lootTables.potions[3] = {"p_fortify_willpower_q", "p_frost_resistance_q", "p_frost_shield_q", "p_lightning shield_q", "p_magicka_resistance_q", "p_poison_resistance_q", "p_burden_q", "p_feather_q", "p_fire_shield_q"}
-brConfig.lootTables.potions[4] = {"p_fortify_speed_e", "p_fortify_strength_e", "p_fortify_willpower_e", "p_frost_resistance_e", "p_frost_shield_e", "p_invisibility_e", "p_lightning shield_e", "p_magicka_resistance_e", "p_poison_resistance_e", "p_burden_e", "p_feather_e", "p_fire_shield_e", "p_jump_e"}
-brConfig.lootTables.scrolls[1] = {"sc_savagemight", "sc_shockbane", "sc_summonskeletalservant", "sc_telvinscourage"}
-brConfig.lootTables.scrolls[2] = {"sc_daynarsairybubble", "sc_didalasknack", "sc_feldramstrepidation", "sc_flamebane", "sc_frostbane", "sc_gonarsgoad"}
-brConfig.lootTables.scrolls[3] = {"sc_restoration", "sc_warriorsblessing", "sc_hellfire", "sc_reynosfins", "sc_blackdeath"}
-brConfig.lootTables.scrolls[4] = {"sc_windwalker", "sc_supremedomination", "sc_greaterdomination", "sc_ninthbarrier", "sc_summongoldensaint"}
-brConfig.lootTables.ingredients[1] = {"ingred_ash_yam_01", "ingred_bread_01", "ingred_bread_01_UNI2", "ingred_bc_bungler's_bane", "ingred_chokeweed_01", "ingred_crab_meat_01"}
-brConfig.lootTables.ingredients[2] = {"ingred_bittergreen_petals_01", "ingred_bloat_01", "ingred_corkbulb_root_01", "ingred_guar_hide_girith", "ingred_gold_kanet_01", "ingred_guar_hide_01"}
-brConfig.lootTables.ingredients[3] = {"ingred_frost_salts_01", "ingred_corprus_weepings_01", "ingred_moon_sugar_01", "ingred_shalk_resin_01", "ingred_sload_soap_01", "ingred_hackle-lo_leaf_01"}
-brConfig.lootTables.ingredients[4] = {"ingred_vampire_dust_01", "ingred_Dae_cursed_diamond_01", "ingred_diamond_01", "ingred_cursed_daedras_heart_01", "ingred_daedras_heart_01", "ingred_daedra_skin_01"}
+brConfig.lootTables.unique[4] = {}
+brConfig.lootTables.armor[1] = {"cloth bracer left", "cloth bracer right", "left leather bracer", "right leather bracer", "fur_bracer_left", "fur_bracer_right", "netch_leather_gauntlet_left", "netch_leather_gauntlet_right", "fur_gauntlet_left", "fur_gauntlet_right", "chitin guantlet [sic] - left", "chitin guantlet [sic] - right", "netch_leather_boots", "fur_boots", "gondolier_helm", "iron_bracer_left", "iron_bracer_right", "netch_leather_pauldron_left", "netch_leather_pauldron_right", "fur_pauldron_left", "fur_pauldron_right", "chitin boots", "iron_gauntlet_left", "iron_gauntlet_right", "netch_leather_helm", "fur_helm", "chitin pauldron - left", "chitin pauldron - right", "netch_leather_boiled_helm", "chitin helm", "chitin_mask_helm", "mole_crab_helm", "morag_tong_helm", "netch_leather_greaves", "fur_greaves", "chitin_watchman_helm", "iron_pauldron_left", "iron_pauldron_right", "fur_colovian_helm", "templar bracer left", "templar bracer right", "imperial_chain_pauldron_left", "imperial_chain_pauldron_right", "steel_gauntlet_left", "steel_gauntlet_right", "chitin greaves", "dust_adept_helm", "iron_helmet", "imperial left gauntlet", "imperial right gauntlet", "netch_leather_cuirass", "fur_bearskin_cuirass", "fur_cuirass", "imperial_chain_coif_helm", "steel_boots", "iron_greaves", "chitin cuirass", "netch_leather_boiled_cuirass", "netch_leather_shield", "chitin_shield", "nordic_leather_shield", "netch_leather_towershield", "chitin_towershield", "iron_shield", "iron_towershield", "steel_shield", "trollbone_shield"}
+brConfig.lootTables.armor[2] = {"steel_pauldron_left", "steel_pauldron_right", "cephalopod_helm", "imperial_chain_greaves", "bonemold_bracer_left", "bonemold_bracer_right", "nordic_iron_helm", "imperial boots", "templar boots", "iron boots", "imperial left pauldron", "imperial right pauldron", "steel_helm", "templar_pauldron_left", "templar_pauldron_right", "imperial_studded_cuirass", "trollbone_helm", "iron_cuirass", "imperial helmet armor", "templar_helmet_armor", "nordic_ringmail_cuirass", "steel_greaves", "imperial_chain_cuirass", "imperial_greaves", "newtscale_cuirass", "heavy_leather_boots", "bonemold_boots", "templar_greaves", "bonemold_pauldron_l", "bonemold_pauldron_r", "bonemold_armun-an_pauldron_l", "bonemold_armun-an_pauldron_r", "silver_helm", "dragonscale_helm", "nordic_iron_cuirass", "bonemold_gah-julan_pauldron_l", "bonemold_gah-julan_pauldron_r", "bonemold_helm", "bonemold_founders_helm", "bonemold_armun-an_helm", "steel_cuirass", "imperial cuirass_armor", "dwemer_bracer_left", "dwemer_bracer_right", "bonemold_gah-julan_helm", "trollbone_cuirass", "bonemold_chuzei_helm", "templar_cuirass", "bonemold_greaves", "silver_cuirass", "dwemer_boots", "imperial shield", "steel_towershield", "bonemold_shield", "dragonscale_towershield", "bonemold_towershield", "bonemold_tshield_hlaaluguard", "bonemold_tshield_redoranguard", "bonemold_tshield_telvanniguard", "dwemer_shield"}
+brConfig.lootTables.armor[3] = {"dragonscale_cuirass", "bonemold_cuirass", "bonemold_armun-an_cuirass", "silver_dukesguard_cuirass", "bonemold_gah-julan_cuirass", "dwemer_pauldron_left", "dwemer_pauldron_right", "orcish_bracer_left", "orcish_bracer_right", "dwemer_helm", "dwemer_greaves", "orcish_boots", "orcish_pauldron_left", "orcish_pauldron_right", "dwemer_cuirass", "orcish_helm", "indoril left gauntlet", "indoril right gauntlet", "orcish_greaves", "indoril boots", "dreugh_helm", "indoril pauldron left", "indoril pauldron right", "orcish_cuirass", "indoril helmet", "redoran_master_helm", "glass_bracer_left", "glass_bracer_right", "indoril shield", "orcish_towershield", "dreugh_shield", "glass_shield"}
+brConfig.lootTables.armor[4] = {"ebony_bracer_left", "ebony_bracer_right", "dreugh_cuirass", "indoril cuirass", "glass_boots", "glass_pauldron_left", "glass_pauldron_right", "ebony_boots", "glass_helm", "ebony_pauldron_left", "ebony_pauldron_right", "daedric_fountain_helm", "daedric_terrifying_helm", "daedric_gauntlet_left", "daedric_gauntlet_right", "ebony_closed_helm", "daedric_god_helm", "glass_greaves", "daedric_boots", "ebony_greaves", "daedric_pauldron_left", "daedric_pauldron_right", "glass_cuirass", "ebony_cuirass", "daedric_greaves", "daedric_cuirass", "ebony_shield", "glass_towershield", "ebony_towershield", "daedric_shield", "daedric_towershield"}
+brConfig.lootTables.weapons[1] = {	"chitin club", "chitin dagger", "miner's pick", "wooden staff", "iron club", "iron dagger", "chitin shortsword", "chitin spear", "iron tanto", "spiked club", "chitin war axe", "steel club", "steel dagger", "iron shortsword", "iron spear", "Iron Long Spear", "iron mace", "iron wakizashi", "iron saber", "steel staff", "steel tanto", "iron war axe", "imperial shortsword", "iron broadsword", "iron warhammer", "silver dagger", "steel shortsword", "iron longsword", "steel spear", "iron halberd", "steel mace", "steel wakizashi", "chitin short bow", "long bow"}
+brConfig.lootTables.weapons[2] = {	"steel saber", "iron battle axe", "silver staff", "steel axe", "steel war axe", "nordic battle axe", "steel broadsword", "imperial broadsword", "steel warhammer", "silver shortsword", "steel longsword", "iron claymore", "steel halberd", "silver spear", "nordic broadsword", "steel battle axe", "steel katana", "silver war axe", "silver longsword", "steel claymore", "nordic claymore", "dreugh club", "steel dai-katana", "dwarven shortsword", "dwarven spear", "silver claymore", "dwarven mace", "dreugh staff", "dwarven war axe", "dwarven warhammer", "dwarven halberd", "dwarven battle axe", "short bow", "steel longbow", "steel crossbow"}
+brConfig.lootTables.weapons[3] = {	"dwarven claymore", "foeburner", "orcish warhammer", "orcish battle axe", "glass dagger", "6th bell hammer", "glass staff", "ebony staff", "daedric club", "daedric dagger", "ebony shortsword", "ebony spear", "glass war axe", "ebony mace", "daedric staff", "daedric tanto", "bonemold long bow"}
+brConfig.lootTables.weapons[4] = {	"ebony war axe", "ebony broadsword", "glass longsword", "glass halberd", "daedric shortsword", "ebony longsword", "daedric spear", "daedric mace", "daedric war axe", "daedric warhammer", "glass claymore", "daedric longsword", "daedric wakizashi", "daedric battle axe", "daedric katana", "daedric claymore", "daedric dai-katana", "dwarven crossbow", "daedric long bow"}
+brConfig.lootTables.projectiles[1] = {"corkbulb arrow", "chitin arrow", "iron arrow", "iron bolt", "bonemold arrow", "steel arrow", "steel bolt", "bonemold bolt", "silver arrow"}
+brConfig.lootTables.projectiles[2] = {"iron throwing knife", "chitin throwing star", "steel throwing star", "orcish bolt", "steel throwing knife", "corkbulb bolt", "steel dart", "silver dart", "glass arrow"}
+brConfig.lootTables.projectiles[3] = {"silver bolt", "ebony arrow", "silver throwing star", "glass throwing knife"}
+brConfig.lootTables.projectiles[4] = {"glass throwing star", "daedric arrow", "ebony dart", "ebony throwing star", "daedric dart"}
+brConfig.lootTables.potions[1] = {"p_restore_fatigue_c", "p_restore_health_c", "p_restore_intelligence_c", "p_restore_luck_c", "p_restore_magicka_c", "p_restore_personality_c", "p_restore_speed_c", "p_restore_strength_c", "p_restore_willpower_c", "p_levitation_c", "p_shock_resistance_c", "p_spell_absorption_c", "Potion_Local_Brew_01", "potion_comberry_wine_01", "p_drain_luck_q", "p_drain_strength_q", "p_drain willpower_q", "p_drain_magicka_q", "p_drain_speed_q", "p_drain_intelligence_q", "p_drain_personality_q", "p_drain_agility_q", "p_drain_endurance_q", "p_disease_resistance_b", "p_fire_resistance_b", "p_fortify_agility_b", "p_fortify_endurance_b", "p_fortify_fatigue_b", "p_fortify_health_b", "p_fortify_intelligence_b", "p_fortify_magicka_b", "p_fortify_personality_b", "p_fortify_strength_b", "p_fortify_willpower_b", "p_frost_resistance_b", "p_lightning shield_b", "p_magicka_resistance_b", "p_poison_resistance_b", "p_burden_b", "p_feather_b", "p_fire_shield_b", "p_fortify_luck_b", "p_fortify_speed_b", "p_frost_shield_b", "p_invisibility_b", "p_jump_b", "p_light_b", "p_night-eye_b", "p_paralyze_b", "p_reflection_b", "p_chameleon_b", "p_silence_b", "p_swift_swim_b", "p_restore_agility_b", "p_restore_endurance_b", "p_restore_fatigue_b", "p_restore_health_b", "p_restore_intelligence_b", "p_restore_luck_b", "p_restore_magicka_b", "p_restore_personality_b", "p_restore_speed_b", "p_restore_strength_b", "p_restore_willpower_b", "p_levitation_b", "p_shock_resistance_b", "p_spell_absorption_b"}
+brConfig.lootTables.potions[2] = {"p_frost_shield_s", "p_invisibility_s", "p_jump_s", "p_light_s", "p_night-eye_s", "p_paralyze_s", "p_reflection_s", "p_restore_luck_s", "p_chameleon_s", "p_silence_s", "p_frost_resistance_s", "p_restore_agility_s", "p_restore_endurance_s", "p_restore_fatigue_s", "p_restore_health_s", "p_restore_intelligence_s", "p_restore_magicka_s", "p_restore_personality_s", "p_restore_speed_s", "p_restore_strength_s", "p_restore_willpower_s", "p_levitation_s", "p_shock_resistance_s", "p_spell_absorption_s", "potion_comberry_brandy_01", "p_cure_blight_s", "potion_local_liquor_01", "p_cure_common_s", "p_cure_paralyzation_s", "p_cure_poison_s", "p_disease_resistance_c", "p_fire_resistance_c", "p_fortify_agility_c", "p_fortify_endurance_c", "p_fortify_fatigue_c", "p_fortify_intelligence_c", "p_fortify_personality_c", "p_fortify_strength_c", "p_fortify_willpower_c", "p_frost_resistance_c", "p_lightning shield_c", "p_magicka_resistance_c", "p_poison_resistance_c", "p_burden_c", "p_feather_c", "p_fire_shield_c", "p_fortify_health_c", "p_fortify_luck_c", "p_fortify_magicka_c", "p_fortify_speed_c", "p_frost_shield_c", "p_invisibility_c", "p_jump_c", "p_light_c", "p_night-eye_c", "p_paralyze_c", "p_reflection_c", "p_chameleon_c", "p_silence_c", "p_swift_swim_c", "p_restore_agility_c", "p_restore_endurance_c"}
+brConfig.lootTables.potions[3] = {"p_fortify_willpower_q", "p_frost_resistance_q", "p_frost_shield_q", "p_lightning shield_q", "p_magicka_resistance_q", "p_poison_resistance_q", "p_burden_q", "p_feather_q", "p_fire_shield_q", "p_fortify_luck_q", "p_fortify_speed_q", "p_invisibility_q", "p_jump_q", "p_light_q", "p_night-eye_q", "p_paralyze_q", "p_reflection_q", "p_chameleon_q", "p_silence_q", "p_swift_swim_q", "p_restore_agility_q", "p_restore_endurance_q", "p_restore_fatigue_q", "p_restore_health_q", "p_restore_intelligence_q", "p_restore_luck_q", "p_restore_magicka_q", "p_restore_personality_q", "p_restore_speed_q", "p_restore_strength_q", "p_restore_willpower_q", "P_Levitation_Q", "p_shock_resistance_q", "p_spell_absorption_q", "p_lovepotion_unique", "p_detect_creatures_s", "p_detect_enchantment_s", "p_detect_key_s", "p_dispel_s", "p_almsivi_intervention_s", "p_mark_s", "p_recall_s", "p_slowfall_s", "p_telekinesis_s", "p_water_breathing_s", "p_water_walking_s", "p_disease_resistance_s", "p_fire resistance_s", "p_fortify_agility_s", "p_fortify_endurance_s", "p_fortify_fatigue_s", "p_fortify_health_s", "p_fortify_intelligence_s", "p_fortify_luck_s", "p_fortify_magicka_s", "p_fortify_personality_s", "p_fortify_speed_s", "p_fortify_strength_s", "p_fortify_willpower_s", "p_lightning shield_s", "p_magicka_resistance_s", "p_poison_resistance_s", "p_burden_s", "p_fire_shield_s"}
+brConfig.lootTables.potions[4] = {"p_heroism_s", "potion_skooma_01", "p_vintagecomberrybrandy1", "p_disease_resistance_e", "p_fire_resistance_e", "p_fortify_agility_e", "p_fortify_attack_e", "p_fortify_endurance_e", "p_fortify_fatigue_e", "p_fortify_health_e", "p_fortify_intelligence_e", "p_fortify_luck_e", "p_fortify_magicka_e", "p_fortify_personality_e", "p_fortify_speed_e", "p_fortify_strength_e", "p_fortify_willpower_e", "p_frost_resistance_e", "p_frost_shield_e", "p_invisibility_e", "p_lightning shield_e", "p_magicka_resistance_e", "p_poison_resistance_e", "p_burden_e", "p_feather_e", "p_fire_shield_e", "p_jump_e", "p_light_e", "p_night-eye_e", "p_paralyze_e", "p_reflection_e", "p_chameleon_e", "p_silence_e", "p_swift_swim_e", "p_restore_agility_e", "p_restore_endurance_e", "p_restore_fatigue_e", "p_restore_health_e", "p_restore_intelligence_e", "p_restore_luck_e", "p_restore_magicka_e", "p_restore_personality_e", "p_restore_speed_e", "p_restore_strength_e", "p_restore_willpower_e", "p_levitation_e", "p_shock_resistance_e", "p_spell_absorption_e", "potion_cyro_brandy_01", "Potion_Cyro_Whiskey_01", "potion_t_bug_musk_01", "p_cure_common_unique", "p_disease_resistance_q", "p_fire_resistance_q", "p_fortify_agility_q", "p_fortify_endurance_q", "p_fortify_fatigue_q", "p_fortify_health_q", "p_fortify_intelligence_q", "p_fortify_magicka_q", "p_fortify_personality_q", "p_fortify_strength_q"}
+brConfig.lootTables.scrolls[1] = {"sc_savagemight", "sc_shockbane", "sc_summonskeletalservant", "sc_telvinscourage", "sc_tendilstrembling", "sc_tevilspeace", "sc_tevralshawkshaw", "sc_dawnsprite", "sc_gamblersprayer", "sc_mageseye", "sc_oathfast", "sc_thirdbarrier", "sc_tinurshoptoad", "sc_toususabidingbeast", "sc_ulmjuicedasfeather", "sc_vigor", "sc_vitality", "sc_healing", "sc_radrenesspellbreaker", "sc_salensvivication", "sc_cureblight_ranged", "sc_secondbarrier", "sc_inaschastening", "sc_leaguestep", "sc_mark", "sc_daerirsmiracle", "sc_drathiswinterguest", "sc_taldamsscorcher", "sc_FiercelyRoastThyEnemy_unique", "sc_ondusisunhinging", "sc_firstbarrier", "sc_almsiviintervention", "sc_divineintervention", "sc_galmsesseal", "sc_daydenespanacea"}
+brConfig.lootTables.scrolls[2] = {"sc_daynarsairybubble", "sc_didalasknack", "sc_feldramstrepidation", "sc_flamebane", "sc_frostbane", "sc_gonarsgoad", "sc_greydeath", "sc_greydespair", "sc_greyfate", "sc_greymind", "sc_greyscorn", "sc_greysloth", "sc_greyweakness", "sc_heartwise", "sc_inasismysticfinger", "sc_insight", "sc_invisibility", "sc_llirosglowingeye", "sc_mageweal", "sc_manarape", "sc_mondensinstigator", "sc_nerusislockjaw", "sc_princeovsbrightball", "sc_reddeath", "sc_reddespair", "sc_redfate", "sc_redmind", "sc_redscorn", "sc_redsloth", "sc_redweakness", "sc_reynosbeastfinder"}
+brConfig.lootTables.scrolls[3] = {"sc_restoration", "sc_warriorsblessing", "sc_hellfire", "sc_reynosfins", "sc_blackdeath", "sc_blackdespair", "sc_blackfate", "sc_blackmind", "sc_blackscorn", "sc_blacksloth", "sc_blackweakness", "sc_flameguard", "sc_frostguard", "sc_shockguard", "sc_blackstorm", "sc_fourthbarrier", "sc_alvusiaswarping", "sc_elevramssty", "sc_fadersleadenflesh", "sc_radiyasicymask", "sc_selisfieryward", "sc_stormward", "sc_vaerminaspromise", "sc_selynsmistslippers", "sc_sertisesporphyry", "sc_icarianflight", "sc_purityofbody", "sc_dedresmasterfuleye", "sc_bloodfire", "sc_brevasavertedeyes", "sc_celerity"}
+brConfig.lootTables.scrolls[4] = {"sc_windwalker", "sc_supremedomination", "sc_greaterdomination", "sc_ninthbarrier", "sc_summongoldensaint", "sc_argentglow", "sc_ekashslocksplitter", "sc_lesserdomination", "sc_lordmhasvengeance", "sc_uthshandofheaven", "sc_windform", "sc_psychicprison", "sc_summonfrostatronach", "sc_balefulsuffering", "sc_bloodthief", "sc_mindfeeder", "sc_corruptarcanix", "sc_summonflameatronach", "sc_tranasasspellmire", "sc_tranasasspelltrap", "sc_tranasasspelltwist", "sc_fphyggisgemfeeder", "sc_elementalburstshock", "sc_sixthbarrier", "sc_drathissoulrot", "sc_elementalburstfire", "sc_elementalburstfrost", "sc_illneasbreath", "sc_golnaraseyemaze", "sc_fifthbarrier"}
+brConfig.lootTables.ingredients[1] = {}
+brConfig.lootTables.ingredients[2] = {}
+brConfig.lootTables.ingredients[3] = {}
+brConfig.lootTables.ingredients[4] = {}
+brConfig.lootTables.alchemyTools[1] = {}
+brConfig.lootTables.alchemyTools[2] = {}
+brConfig.lootTables.alchemyTools[3] = {}
+brConfig.lootTables.alchemyTools[4] = {}
+brConfig.lootTables.clothing[1] = {}
+brConfig.lootTables.clothing[2] = {}
+brConfig.lootTables.clothing[3] = {}
+brConfig.lootTables.clothing[4] = {}
 
 
 

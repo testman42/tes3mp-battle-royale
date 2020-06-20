@@ -1,7 +1,3 @@
-
--- Battle Royale game mode by testman
--- debug module v0.7
-
 debug = {}
 
 -- ====================== UTILITY FUNCTIONS ======================
@@ -64,6 +60,13 @@ debug.ResetMapTiles = function(pid)
     if brConfig.debugLevel > 0 then
         mapLogic.ResetMapTiles()
         playerLogic.SendMapToPlayer(pid)
+    end
+end
+
+-- used to manually clear map
+debug.ForceNextFog = function(pid)
+    if brConfig.debugLevel > 0 then
+        matchLogic.ForceAdvanceZoneShrink()
     end
 end
 
