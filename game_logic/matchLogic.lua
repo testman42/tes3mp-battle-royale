@@ -49,11 +49,15 @@ matchLogic.Start = function()
     
     --debug.DeleteExteriorCellData()
     
+    matchLogic.SetInitialStage()
+    
     mapLogic.GenerateZones()
 
     matchLogic.StartZoneShrinkProcess()
 
     mapLogic.ResetMapTiles()
+    
+    mapLogic.UpdateMap()
 
     mapLogic.SpawnLoot()
 
@@ -97,6 +101,8 @@ matchLogic.End = function()
     Players[playerList[1]]:Save()
     FullLoot.destroyAllDeathContainers()
     
+    mapLogic.ResetWorld()
+    
     -- clear playerList only *after* all the player-relates stuff above is handled
     playerList = {}
     
@@ -108,12 +114,17 @@ matchLogic.End = function()
     end
 end
 
-matchLogic.IsMatchInProgress = function()
-  return matchInProgress
-end
 
-matchLogic.IsPlayerInMatch = function(pid)
-  return tableHelper.containsValue(playerList, pid)
+matchLogic.SetInitialStage = function()
+    
+    currentFogStage = brConfig.defaultMatchStage
+    
+    -- determine the initial match stage
+    for index=1,#brConfig.playerCountStageMapping do
+        if #playerList >= brConfig.playerCountStageMapping[index] then
+            currentFogStage = currentFogStage + 1
+        end
+    end
 end
 
 matchLogic.RemovePlayerFromPlayerList = function(pid)
@@ -165,7 +176,6 @@ matchLogic.HandleAirMode = function()
 end
 
 matchLogic.StartZoneShrinkProcess = function()
-    currentFogStage = 1
     matchLogic.StartZoneShrinkTimerForStage(currentFogStage)
 end
 
@@ -194,9 +204,8 @@ matchLogic.GetDamageLevelForCell = function(x, y)
     return matchLogic.GetDamageLevelForZone(zone)
 end
 
--- for debug purposes, not used outside of brDebug
-matchLogic.ForceAdvanceZoneShrink = function()
-    AdvanceZoneShrink()
+matchLogic.IsPlayerInMatch = function(pid)
+  return tableHelper.containsValue(playerList, pid)
 end
 
 matchLogic.GetCurrentStage = function()
@@ -206,6 +215,16 @@ end
 matchLogic.GetPlayerList = function()
   return playerList
 end
+
+matchLogic.IsMatchInProgress = function()
+  return matchInProgress
+end
+
+-- for debug purposes, not used outside of brDebug
+matchLogic.ForceAdvanceZoneShrink = function()
+    AdvanceZoneShrink()
+end
+
 
 matchLogic.InformPlayersAboutStageProgress = function(pid, damageLevel)
     message = "Zone shrink stage " .. color.Yellow .. tostring(currentFogStage) .. 

@@ -23,13 +23,18 @@ end
 -- TODO: rewrite this in a way that can generate hybrid zone array (cell-based + geometry-based)
 mapLogic.GenerateZones = function()
     
+    zoneAnchors = {}
+    
+    -- TODO: think about introducing some randomness to this. Few cells of random offset?
+    -- TEST: 3 cells of random offset 
+    previousAnchor = {(brConfig.mapCentre[1]+math.random(-3,3))*8192+4096, (brConfig.mapCentre[2]+math.random(-3,3))*8192+4096}
+    --previousAnchor = {brConfig.mapCentre[1]*8192+4096, brConfig.mapCentre[2]*8192+4096}
+    
     for zoneIndex, zoneParameters in pairs(brConfig.zoneSizes) do
         zoneAnchors[zoneIndex] = {}
         zoneRadius = zoneParameters[2]*4096
-        if zoneIndex == 1 then
-            -- TODO: think about introducing some randomness to this. Few cells of random offset?
-            previousAnchor = {brConfig.mapCentre[1]*8192+4096, brConfig.mapCentre[2]*8192+4096}
-        else
+        -- only set previousAnchor if the firt zone defined by mapCentre was already generated
+        if zoneIndex > 1 then
             previousAnchor = zoneAnchors[zoneIndex-1]
         end
         
@@ -63,13 +68,15 @@ mapLogic.GetZoneForCell = function(x, y)
     local offset = 1000
     -- go through all zones in reverse
     for zone=#zoneAnchors, 1, -1 do
-        if mapLogic.DistanceBetweenPositions(x_coordinates, y_coordinates, zoneAnchors[zone][1], zoneAnchors[zone][2]) < (brConfig.zoneSizes[zone][2])*8192+2048 then
-            return zone
-        end
-        -- see if anchor is actually inside cell in question (makes the zones with size 0 still appear)
-        anchorCell = mapLogic.GetCellForPosition(zoneAnchors[zone][1], zoneAnchors[zone][2])
-        if anchorCell[1] == x and anchorCell[2] == y then
-           return zone 
+        if zoneAnchors[zone] then
+            if mapLogic.DistanceBetweenPositions(x_coordinates, y_coordinates, zoneAnchors[zone][1], zoneAnchors[zone][2]) < (brConfig.zoneSizes[zone][2])*8192+2048 then
+                return zone
+            end
+            -- see if anchor is actually inside cell in question (makes the zones with size 0 still appear)
+            anchorCell = mapLogic.GetCellForPosition(zoneAnchors[zone][1], zoneAnchors[zone][2])
+            if anchorCell[1] == x and anchorCell[2] == y then
+               return zone 
+            end
         end
     end
     
@@ -89,7 +96,7 @@ mapLogic.GetCellsInZone = function(zone)
                 end
             end
         end
-    elseif brConfig.zoneSizes[zone] then
+    elseif brConfig.zoneSizes[zone] and zoneAnchors[zone] then
         zoneCentre = mapLogic.GetCellForPosition(zoneAnchors[zone][1], zoneAnchors[zone][2])
         -- TODO: lolwait, am I scanning area 4x too large? Zone takes size as diameter, not as radius. Optimise this
         zoneAreaBottomLeftCorner = {zoneCentre[1]-brConfig.zoneSizes[zone][2], zoneCentre[2]-brConfig.zoneSizes[zone][2]}
@@ -494,6 +501,10 @@ mapLogic.ResetWorld = function()
     
 end
 
+mapLogic.GetZoneAnchors = function()
+    return zoneAnchors
+end
+
 -- writes to disk all the loaded cell data
 -- used so that we don't write to disk for every change in cell during match start
 mapLogic.SaveAllLoadedCells = function()
@@ -535,6 +546,19 @@ mapLogic.IsCellExternal = function(cell)
         return false
     end
     return true
+end
+
+mapLogic.GerRandomPositionInsideZone = function(zoneIndex)
+    if zoneAnchors[zoneIndex] and brConfig.zoneSizes[zoneIndex] then
+        local zoneRadius = brConfig.zoneSizes[zoneIndex][2]*4096
+        local random_x_offset = math.random(-zoneRadius,zoneRadius)
+        -- TODO: learn trigonometry instead of getting your bro Pythagoras to help you cheat
+        local random_y_offset = (zoneRadius-math.abs(random_x_offset))*math.random(-1,1)
+        
+        local random_x = zoneAnchors[zoneIndex][1] + random_x_offset
+        local random_y = zoneAnchors[zoneIndex][2] + random_y_offset
+        return {random_x, random_y}
+    end
 end
 
 return mapLogic

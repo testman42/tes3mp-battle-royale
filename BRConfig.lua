@@ -39,6 +39,13 @@ brConfig.config = DataManager.loadConfiguration(brConfig.scriptName, brConfig.de
 -- TODO: properly define debug levels
 brConfig.debugLevel = 0
 
+-- what is the starting fog stage with just 2 players
+brConfig.defaultMatchStage = 4
+
+-- determines what the initial stage of match will be
+-- {4, 6, 10, 15} - 2-4 players = stage 4, 5-6 = stage 3, 7-10 = stage 2, 10+ = stage 1
+brConfig.playerCountStageMapping = {4, 6, 10}
+
 -- how fast time passes
 -- you will most likely want this to be very low in order to have skybox remain the same
 --brConfig.timeScale = 0.1
@@ -63,6 +70,10 @@ brConfig.debugLevel = 0
 
 -- Determines if unique (as in named, non-generic) items will spawn among loot 
 brConfig.allowUniqueItems = true
+
+-- Will loot get spawned only in the initial safe-zone or across whole map
+-- TODO: rework loot spawn logic to accout for this option
+--brConfig.spawnLootOnlyInPlayableArea = true
 
 -- Determines if the GhostFence (magic border around Red Mountain) will be there during the match
 brConfig.enableGhostfence = true
@@ -226,7 +237,7 @@ brConfig.lootSpawnAreas = {
     --calderaTest = {containerCount = {5,4,3,2}, groundLootCount = {1,2,3,4}, uniqueItemCount = {0,0,0,0},  lootSpawnPositions = {}},
     
     -- uncategorised - tier1 = 439, tier2 = 363, tier3 = 283, tier4 = 148
-    uncategorised = {containerCount = {40,30,20,10}, groundLootCount = {200,150,100,50}, uniqueItemCount = {0,0,0,0},  lootSpawnPositions = {}}
+    uncategorised = {containerCount = {20,15,10,10}, groundLootCount = {250,200,180,90}, uniqueItemCount = {0,0,0,0},  lootSpawnPositions = {}}
 }
 
 

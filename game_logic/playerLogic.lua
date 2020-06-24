@@ -33,11 +33,11 @@ end
 playerLogic.SpawnPlayerInMatch = function(pid)
     tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " in exterior")
 
-    -- TEST: use random spawn point for now
-    local random_x = math.random(-40000,80000)
-    local random_y = math.random(-40000,120000)
+    -- TODO: figure out how to make this less of a mess
+    randomSpawnPosition = mapLogic.GerRandomPositionInsideZone(matchLogic.GetCurrentStage()-2)
+    -- we can't do pairs() because it doesn't iterate through array in same order as it was generated
     tes3mp.LogMessage(2, "Spawning player " .. tostring(pid) .. " at " .. tostring(random_x) .. ", " .. tostring(random_y))
-    local chosenSpawnPoint = {"1, 1", random_x, random_y, 40000, 0}
+    local chosenSpawnPoint = {"1, 1", randomSpawnPosition[1], randomSpawnPosition[2], 40000, 0}
 
     tes3mp.SetCell(pid, chosenSpawnPoint[1])
     tes3mp.SendCell(pid)
@@ -344,7 +344,7 @@ local GetConnectedPlayerList = function()
     local matchList = ""
     local lobbyList = ""
     local separator = ""
-    local divider = ""
+    local divider = "\n"
 
     for playerIndex = 0,lastPid do
         if playerIndex == lastPid then
@@ -354,7 +354,7 @@ local GetConnectedPlayerList = function()
         end
         if Players[playerIndex] ~= nil and Players[playerIndex]:IsLoggedIn() then
             if matchLogic.IsPlayerInMatch(playerIndex) then
-                matchList = matchList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
+                matchList = matchList .. color.SteelBlue .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
                 ", ping: " .. tostring(tes3mp.GetAvgPing(Players[playerIndex].pid)) .. ")" .. divider
             else
                 lobbyList = lobbyList .. tostring(Players[playerIndex].name) .. " (pid: " .. tostring(Players[playerIndex].pid) ..
@@ -364,13 +364,13 @@ local GetConnectedPlayerList = function()
     end
 
     if matchList ~= "" and lobbyList ~= "" then
-        separator = "-------------\n"
+        separator = "---------------\n"
     else
         matchTitle = ""
         lobbyTitle = ""
     end
     
-    result = matchTitle .. color.SteelBlue .. matchList .. "#caa560" .. separator .. lobbyTitle .. lobbyList
+    result = matchTitle .. matchList .. "#caa560" .. separator .. lobbyTitle .. lobbyList
     return  result
 end
 

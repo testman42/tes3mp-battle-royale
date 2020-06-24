@@ -78,4 +78,17 @@ debug.DeleteExteriorCellData = function()
     end
 end
 
+debug.GenerateMapTiles = function()
+    if brConfig.debugLevel > 0 then
+        mapLogic.GenerateZonesAfter(1)
+    end
+end
+
+debug.ZoneTest = function(pid)
+    if brConfig.debugLevel > 0 then
+        debug.GenerateMapTiles()
+        debug.ShowZones(pid)
+    end
+end
+
 return debug
